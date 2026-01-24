@@ -20,9 +20,7 @@ export default function NotFound() {
           </CardHeader>
 
           <CardFooter class="justify-center gap-2">
-            <A href={window.location.href}>
-              <Button variant="outline">Refresh Page</Button>
-            </A>
+            <Button variant="outline">Refresh Page</Button>
             <A href="/">
               <Button>Go Back Home</Button>
             </A>
