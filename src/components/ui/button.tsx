@@ -7,7 +7,7 @@ export interface ButtonProps extends JSX.ButtonHTMLAttributes<HTMLButtonElement>
 }
 
 const Button: Component<ButtonProps> = (props) => {
-  const [local, others] = splitProps(props, ["variant", "size", "class", "children"]);
+  const [local, others] = splitProps(props, ["variant", "size", "class"]);
 
   const variantClasses = {
     default: "bg-primary text-white hover:bg-primary/90 active:bg-primary/95 shadow-apple-button hover:shadow-apple-button-hover active:shadow-none",
@@ -60,7 +60,7 @@ const Button: Component<ButtonProps> = (props) => {
       {...getButtonStyle()}
       {...others}
     >
-      {local.children}
+      {props.children}
     </button>
   );
 };
