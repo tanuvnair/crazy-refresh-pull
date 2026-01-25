@@ -117,11 +117,31 @@ export async function searchYouTubeVideos(
 
   const searchResponse = await fetch(searchUrl.toString());
   if (!searchResponse.ok) {
-    const error = await searchResponse.text();
+    let error = "Unknown error";
+    try {
+      const contentType = searchResponse.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        const errorData = await searchResponse.json();
+        error = errorData.error?.message || JSON.stringify(errorData);
+      } else {
+        error = await searchResponse.text();
+      }
+    } catch {
+      error = `HTTP ${searchResponse.status}: ${searchResponse.statusText}`;
+    }
     throw new Error(`YouTube API error: ${error}`);
   }
 
-  const searchData: YouTubeSearchResponse = await searchResponse.json();
+  let searchData: YouTubeSearchResponse;
+  try {
+    const contentType = searchResponse.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+      throw new Error("Response is not JSON");
+    }
+    searchData = await searchResponse.json();
+  } catch (parseError) {
+    throw new Error(`Failed to parse YouTube API response: ${parseError instanceof Error ? parseError.message : "Invalid JSON"}`);
+  }
 
   // Get video IDs to fetch statistics and content details
   const videoIds = searchData.items.map((item) => item.id.videoId);
@@ -133,9 +153,19 @@ export async function searchYouTubeVideos(
   detailsUrl.searchParams.set("key", apiKey);
 
   const detailsResponse = await fetch(detailsUrl.toString());
-  const detailsData: YouTubeVideoDetailsResponse = detailsResponse.ok
-    ? await detailsResponse.json()
-    : { items: [] };
+  let detailsData: YouTubeVideoDetailsResponse = { items: [] };
+  
+  if (detailsResponse.ok) {
+    try {
+      const contentType = detailsResponse.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        detailsData = await detailsResponse.json();
+      }
+    } catch (parseError) {
+      console.warn("Failed to parse video details response, using empty data:", parseError);
+      detailsData = { items: [] };
+    }
+  }
 
   // Create maps for efficient lookup
   const statsMap = new Map<string, { viewCount?: string; likeCount?: string }>();
@@ -211,6 +241,48 @@ export interface SearchVideosResult {
 }
 
 /**
+ * Handle YouTube search API request
+ * Parses query parameters, validates inputs, and returns formatted response
+ */
+export async function handleYouTubeSearchRequest(request: Request): Promise<Response> {
+  try {
+    const url = new URL(request.url);
+    const query = url.searchParams.get("q") || "";
+    const maxResults = parseInt(url.searchParams.get("maxResults") || "10", 10);
+    const apiKey = url.searchParams.get("apiKey") || process.env.YOUTUBE_API_KEY || "";
+    const geminiApiKey = url.searchParams.get("geminiApiKey") || undefined;
+    const useGeminiFiltering = url.searchParams.get("useGeminiFiltering") === "true";
+
+    const result = await searchVideosWithFiltering({
+      query,
+      youtubeApiKey: apiKey,
+      maxResults,
+      geminiApiKey,
+      useGeminiFiltering,
+    });
+
+    return new Response(JSON.stringify(result), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    const statusCode = errorMessage.includes("required") ? 400 : 500;
+
+    return new Response(
+      JSON.stringify({
+        error: "Failed to fetch YouTube videos",
+        message: errorMessage,
+      }),
+      {
+        status: statusCode,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+  }
+}
+
+/**
  * Search YouTube videos with optional Gemini AI filtering
  * This is the main business logic function that orchestrates the entire search flow
  */
@@ -238,9 +310,18 @@ export async function searchVideosWithFiltering(
   // Apply Gemini AI filtering if enabled
   if (useGeminiFiltering && geminiApiKey && videos.length > 0) {
     try {
+      const videosBeforeFiltering = videos.length;
       const { analyzeVideosWithGemini, filterVideosByAnalysis } = await import("./gemini.server");
       const analysisResults = await analyzeVideosWithGemini(videos, geminiApiKey, customGeminiPrompt);
       videos = filterVideosByAnalysis(videos, analysisResults);
+      const videosAfterFiltering = videos.length;
+      const filteredCount = videosBeforeFiltering - videosAfterFiltering;
+      
+      if (filteredCount > 0) {
+        console.log(`AI filtering applied: ${filteredCount} video(s) filtered out (${videosBeforeFiltering} → ${videosAfterFiltering})`);
+      } else {
+        console.log(`AI filtering applied: All ${videosBeforeFiltering} video(s) passed the authenticity check`);
+      }
     } catch (geminiError) {
       console.error("Failed to analyze videos with Gemini:", geminiError);
       // If Gemini fails, use the videos we already have (graceful degradation)

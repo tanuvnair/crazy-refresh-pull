@@ -25,6 +25,11 @@ export default function Home() {
 
   // Load API keys and settings from storage on mount
   onMount(() => {
+    // Clear search query on mount to prevent stale values on hot reload
+    setSearchQuery("");
+    setError(null);
+    setVideos([]);
+
     try {
       // Load YouTube API key
       let encrypted = getYouTubeApiKeyFromCookie();
@@ -160,10 +165,35 @@ export default function Home() {
       }
 
       const response = await fetch(`/api/youtube?${params.toString()}`);
-      const data = await response.json();
-
+      
       if (!response.ok) {
-        throw new Error(data.error || "Failed to fetch videos");
+        let errorMessage = "Failed to fetch videos";
+        try {
+          // Read as text first, then try to parse as JSON
+          const text = await response.text();
+          try {
+            const errorData = JSON.parse(text);
+            errorMessage = errorData.error || errorData.message || errorMessage;
+          } catch {
+            // If not JSON, use the text as error message
+            errorMessage = text || errorMessage;
+          }
+        } catch {
+          // If we can't read the response, use default message
+          errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        }
+        throw new Error(errorMessage);
+      }
+
+      let data;
+      try {
+        const contentType = response.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+          throw new Error("Response is not JSON");
+        }
+        data = await response.json();
+      } catch (parseError) {
+        throw new Error("Invalid response from server. Please try again.");
       }
 
       setVideos(data.videos || []);
