@@ -156,6 +156,35 @@ export async function analyzeVideosWithGemini(
     throw new Error("Videos array is required");
   }
 
+  // Load feedback data to enhance the prompt
+  let feedbackContext = "";
+  try {
+    const { getFeedbackSummary } = await import("./feedback.server");
+    const feedback = await getFeedbackSummary();
+    
+    if (feedback.positiveCount > 0 || feedback.negativeCount > 0) {
+      feedbackContext = `\n\nLEARNING FROM USER FEEDBACK:\n`;
+      feedbackContext += `The user has provided feedback on ${feedback.positiveCount} positive examples and ${feedback.negativeCount} negative examples.\n`;
+      
+      if (feedback.positiveExamples.length > 0) {
+        feedbackContext += `\nPositive feedback video IDs (examples of authentic content the user liked):\n`;
+        feedbackContext += feedback.positiveExamples.map((id) => `- ${id}`).join("\n");
+        feedbackContext += `\nUse these as reference for what the user considers authentic and valuable content.\n`;
+      }
+      
+      if (feedback.negativeExamples.length > 0) {
+        feedbackContext += `\nNegative feedback video IDs (examples of content the user disliked):\n`;
+        feedbackContext += feedback.negativeExamples.map((id) => `- ${id}`).join("\n");
+        feedbackContext += `\nUse these as reference for what the user considers low-quality or "slop" content.\n`;
+      }
+      
+      feedbackContext += `\nWhen analyzing videos, consider patterns from these feedback examples to better match the user's preferences.\n`;
+    }
+  } catch (error) {
+    console.warn("Failed to load feedback data for AI learning:", error);
+    // Continue without feedback if it fails
+  }
+
   const prompt = customPrompt || DEFAULT_ANALYSIS_PROMPT;
 
   // Prepare video data for analysis
@@ -166,7 +195,7 @@ export async function analyzeVideosWithGemini(
     channelTitle: video.channelTitle,
   }));
 
-  const analysisPrompt = `${prompt}
+  const analysisPrompt = `${prompt}${feedbackContext}
 
 Videos to analyze:
 ${JSON.stringify(videoData, null, 2)}
@@ -344,6 +373,8 @@ Respond with a JSON array of analysis results.`;
 
 /**
  * Filter videos based on Gemini analysis results
+ * Made less strict: only filter out videos that are explicitly marked as not authentic
+ * Videos with unclear analysis or missing data are included
  */
 export function filterVideosByAnalysis(
   videos: Video[],
@@ -358,7 +389,14 @@ export function filterVideosByAnalysis(
 
   return videos.filter((video) => {
     const analysis = analysisMap.get(video.id);
-    return analysis?.isAuthentic !== false; // Include if authentic or not analyzed
+    // Only filter if explicitly marked as NOT authentic (isAuthentic === false)
+    // Include if: authentic (true), not analyzed (undefined), or missing analysis
+    // This makes filtering less strict - only clear slop is filtered
+    if (analysis === undefined) {
+      return true; // Include if not analyzed
+    }
+    // Only exclude if explicitly false - be lenient with borderline cases
+    return analysis.isAuthentic !== false;
   });
 }
 

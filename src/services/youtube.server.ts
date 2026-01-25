@@ -14,6 +14,7 @@ interface YouTubeSearchResponse {
       publishedAt: string;
     };
   }>;
+  nextPageToken?: string;
 }
 
 interface YouTubeVideoDetailsResponse {
@@ -42,189 +43,151 @@ function parseDuration(duration: string): number {
 }
 
 /**
- * Filter out SLOP/manufactured content using heuristics
- */
-function isAuthenticContent(title: string, description: string, channelTitle: string): boolean {
-  const lowerTitle = title.toLowerCase();
-  const lowerDesc = description.toLowerCase();
-  const lowerChannel = channelTitle.toLowerCase();
-
-  // Filter out Shorts indicators
-  if (lowerTitle.includes("#shorts") || lowerDesc.includes("#shorts")) {
-    return false;
-  }
-
-  // Filter out excessive emojis (more than 3 in title)
-  const emojiCount = (title.match(/[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu) || []).length;
-  if (emojiCount > 3) {
-    return false;
-  }
-
-  // Filter out clickbait patterns
-  const clickbaitPatterns = [
-    /\b(you won't believe|shocked|this will blow your mind|number \d+ will shock you)\b/i,
-    /\b(click here|watch until the end|subscribe now|like and subscribe)\b/i,
-    /^(\d+|\d+th|\d+st|\d+nd|\d+rd)\s+(ways?|reasons?|things?|secrets?|tricks?)/i,
-    /\b(guaranteed|instant|free|limited time|act now)\b/i,
-  ];
-
-  for (const pattern of clickbaitPatterns) {
-    if (pattern.test(title)) {
-      return false;
-    }
-  }
-
-  // Filter out channels with suspicious patterns
-  const suspiciousChannelPatterns = [
-    /\b(compilation|viral|trending|shorts|reels)\b/i,
-  ];
-
-  for (const pattern of suspiciousChannelPatterns) {
-    if (pattern.test(lowerChannel) && lowerChannel.length < 20) {
-      return false;
-    }
-  }
-
-  // Filter out titles that are too short (likely low effort)
-  if (title.length < 10) {
-    return false;
-  }
-
-  // Filter out titles that are ALL CAPS (often clickbait)
-  if (title === title.toUpperCase() && title.length > 20) {
-    return false;
-  }
-
-  return true;
-}
-
-/**
- * Search YouTube videos
+ * Search YouTube videos with pagination support
+ * @param maxResults - Maximum number of videos to return after filtering
+ * @param initialFetchCount - Target number of videos to fetch from YouTube API (before filtering)
  */
 export async function searchYouTubeVideos(
   query: string,
   apiKey: string,
-  maxResults: number = 50
+  maxResults: number = 50,
+  initialFetchCount: number = 300
 ): Promise<Video[]> {
-  // Search for videos
-  const searchUrl = new URL("https://www.googleapis.com/youtube/v3/search");
-  searchUrl.searchParams.set("part", "snippet");
-  searchUrl.searchParams.set("q", query);
-  searchUrl.searchParams.set("type", "video");
-  searchUrl.searchParams.set("maxResults", maxResults.toString());
-  searchUrl.searchParams.set("order", "relevance");
-  searchUrl.searchParams.set("key", apiKey);
+  const YOUTUBE_API_MAX_PER_REQUEST = 50;
+  const allVideos: Video[] = [];
+  let nextPageToken: string | undefined = undefined;
+  let totalFetched = 0;
+  const maxFetchAttempts = initialFetchCount; // Maximum videos to fetch from API
+  
+  // Fetch multiple pages if needed to get enough videos after filtering
+  // Continue until we have enough videos OR we've fetched the max OR no more pages
+  while (allVideos.length < maxResults && totalFetched < maxFetchAttempts) {
+    const searchUrl = new URL("https://www.googleapis.com/youtube/v3/search");
+    searchUrl.searchParams.set("part", "snippet");
+    searchUrl.searchParams.set("q", query);
+    searchUrl.searchParams.set("type", "video");
+    searchUrl.searchParams.set("maxResults", YOUTUBE_API_MAX_PER_REQUEST.toString());
+    searchUrl.searchParams.set("order", "relevance");
+    searchUrl.searchParams.set("key", apiKey);
+    
+    if (nextPageToken) {
+      searchUrl.searchParams.set("pageToken", nextPageToken);
+    }
 
-  const searchResponse = await fetch(searchUrl.toString());
-  if (!searchResponse.ok) {
-    let error = "Unknown error";
+    const searchResponse = await fetch(searchUrl.toString());
+    if (!searchResponse.ok) {
+      let error = "Unknown error";
+      try {
+        const contentType = searchResponse.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const errorData = await searchResponse.json();
+          error = errorData.error?.message || JSON.stringify(errorData);
+        } else {
+          error = await searchResponse.text();
+        }
+      } catch {
+        error = `HTTP ${searchResponse.status}: ${searchResponse.statusText}`;
+      }
+      throw new Error(`YouTube API error: ${error}`);
+    }
+
+    let searchData: YouTubeSearchResponse;
     try {
       const contentType = searchResponse.headers.get("content-type");
-      if (contentType && contentType.includes("application/json")) {
-        const errorData = await searchResponse.json();
-        error = errorData.error?.message || JSON.stringify(errorData);
-      } else {
-        error = await searchResponse.text();
+      if (!contentType || !contentType.includes("application/json")) {
+        throw new Error("Response is not JSON");
       }
-    } catch {
-      error = `HTTP ${searchResponse.status}: ${searchResponse.statusText}`;
-    }
-    throw new Error(`YouTube API error: ${error}`);
-  }
-
-  let searchData: YouTubeSearchResponse;
-  try {
-    const contentType = searchResponse.headers.get("content-type");
-    if (!contentType || !contentType.includes("application/json")) {
-      throw new Error("Response is not JSON");
-    }
-    searchData = await searchResponse.json();
-  } catch (parseError) {
-    throw new Error(`Failed to parse YouTube API response: ${parseError instanceof Error ? parseError.message : "Invalid JSON"}`);
-  }
-
-  // Get video IDs to fetch statistics and content details
-  const videoIds = searchData.items.map((item) => item.id.videoId);
-
-  // Fetch statistics and content details
-  const detailsUrl = new URL("https://www.googleapis.com/youtube/v3/videos");
-  detailsUrl.searchParams.set("part", "statistics,contentDetails");
-  detailsUrl.searchParams.set("id", videoIds.join(","));
-  detailsUrl.searchParams.set("key", apiKey);
-
-  const detailsResponse = await fetch(detailsUrl.toString());
-  let detailsData: YouTubeVideoDetailsResponse = { items: [] };
-  
-  if (detailsResponse.ok) {
-    try {
-      const contentType = detailsResponse.headers.get("content-type");
-      if (contentType && contentType.includes("application/json")) {
-        detailsData = await detailsResponse.json();
-      }
+      searchData = await searchResponse.json();
     } catch (parseError) {
-      console.warn("Failed to parse video details response, using empty data:", parseError);
-      detailsData = { items: [] };
+      throw new Error(`Failed to parse YouTube API response: ${parseError instanceof Error ? parseError.message : "Invalid JSON"}`);
     }
-  }
 
-  // Create maps for efficient lookup
-  const statsMap = new Map<string, { viewCount?: string; likeCount?: string }>();
-  const durationMap = new Map<string, number>();
+    // Update pagination token
+    nextPageToken = searchData.nextPageToken;
+    totalFetched += searchData.items.length;
 
-  if (detailsData.items) {
-    for (const item of detailsData.items) {
-      if (item.id) {
-        if (item.statistics) {
-          statsMap.set(item.id, item.statistics);
+    // Get video IDs to fetch statistics and content details
+    const videoIds = searchData.items.map((item) => item.id.videoId);
+
+    // Fetch statistics and content details
+    const detailsUrl = new URL("https://www.googleapis.com/youtube/v3/videos");
+    detailsUrl.searchParams.set("part", "statistics,contentDetails");
+    detailsUrl.searchParams.set("id", videoIds.join(","));
+    detailsUrl.searchParams.set("key", apiKey);
+
+    const detailsResponse = await fetch(detailsUrl.toString());
+    let detailsData: YouTubeVideoDetailsResponse = { items: [] };
+    
+    if (detailsResponse.ok) {
+      try {
+        const contentType = detailsResponse.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          detailsData = await detailsResponse.json();
         }
-        if (item.contentDetails?.duration) {
-          const durationSeconds = parseDuration(item.contentDetails.duration);
-          durationMap.set(item.id, durationSeconds);
+      } catch (parseError) {
+        console.warn("Failed to parse video details response, using empty data:", parseError);
+        detailsData = { items: [] };
+      }
+    }
+
+    // Create maps for efficient lookup
+    const statsMap = new Map<string, { viewCount?: string; likeCount?: string }>();
+    const durationMap = new Map<string, number>();
+
+    if (detailsData.items) {
+      for (const item of detailsData.items) {
+        if (item.id) {
+          if (item.statistics) {
+            statsMap.set(item.id, item.statistics);
+          }
+          if (item.contentDetails?.duration) {
+            const durationSeconds = parseDuration(item.contentDetails.duration);
+            durationMap.set(item.id, durationSeconds);
+          }
         }
       }
     }
-  }
 
-  // Combine search results with filtering
-  const videos: Video[] = [];
+    // Process this page's results with filtering
+    for (const item of searchData.items) {
+      const videoId = item.id.videoId;
+      const duration = durationMap.get(videoId);
+      const title = item.snippet.title;
+      const description = item.snippet.description;
+      const channelTitle = item.snippet.channelTitle;
 
-  for (const item of searchData.items) {
-    const videoId = item.id.videoId;
-    const duration = durationMap.get(videoId);
-    const title = item.snippet.title;
-    const description = item.snippet.description;
-    const channelTitle = item.snippet.channelTitle;
+      // Filter out Shorts (videos shorter than 60 seconds)
+      // Content quality filtering is handled by Gemini AI if enabled
+      if (duration === undefined || duration < 60) {
+        continue;
+      }
 
-    // Filter out Shorts (videos shorter than 60 seconds)
-    if (duration === undefined || duration < 60) {
-      continue;
+      const stats = statsMap.get(videoId) || {};
+      allVideos.push({
+        id: videoId,
+        title,
+        description,
+        thumbnail: item.snippet.thumbnails.high?.url || item.snippet.thumbnails.medium.url,
+        channelTitle,
+        publishedAt: item.snippet.publishedAt,
+        viewCount: stats.viewCount,
+        likeCount: stats.likeCount,
+        url: `https://www.youtube.com/watch?v=${videoId}`,
+      });
+
+      // Stop if we have enough videos
+      if (allVideos.length >= maxResults) {
+        break;
+      }
     }
 
-    // Filter out SLOP/manufactured content
-    if (!isAuthenticContent(title, description, channelTitle)) {
-      continue;
-    }
-
-    const stats = statsMap.get(videoId) || {};
-    videos.push({
-      id: videoId,
-      title,
-      description,
-      thumbnail: item.snippet.thumbnails.high?.url || item.snippet.thumbnails.medium.url,
-      channelTitle,
-      publishedAt: item.snippet.publishedAt,
-      viewCount: stats.viewCount,
-      likeCount: stats.likeCount,
-      url: `https://www.youtube.com/watch?v=${videoId}`,
-    });
-
-    // Limit to maxResults after filtering
-    if (videos.length >= maxResults) {
+    // Stop if no more pages available
+    if (!nextPageToken) {
       break;
     }
   }
 
-  return videos;
+  return allVideos;
 }
 
 export interface SearchVideosOptions {
@@ -305,7 +268,27 @@ export async function searchVideosWithFiltering(
   }
 
   // Search and filter videos using YouTube service
-  let videos = await searchYouTubeVideos(query, youtubeApiKey, maxResults);
+  // Fetch more videos initially (300) to account for filtering, then return maxResults
+  let videos = await searchYouTubeVideos(query, youtubeApiKey, maxResults, 300);
+
+  // Filter out videos that are already in feedback (repeats)
+  try {
+    const { getPositiveFeedback, getNegativeFeedback } = await import("./feedback.server");
+    const positiveFeedback = await getPositiveFeedback();
+    const negativeFeedback = await getNegativeFeedback();
+    const allFeedbackIds = new Set([...positiveFeedback, ...negativeFeedback]);
+    
+    const videosBeforeRepeatFiltering = videos.length;
+    videos = videos.filter((video) => !allFeedbackIds.has(video.id));
+    const repeatFilteredCount = videosBeforeRepeatFiltering - videos.length;
+    
+    if (repeatFilteredCount > 0) {
+      console.log(`Repeat filtering: ${repeatFilteredCount} video(s) filtered out (already in feedback)`);
+    }
+  } catch (feedbackError) {
+    console.warn("Failed to load feedback for repeat filtering:", feedbackError);
+    // Continue without repeat filtering if it fails
+  }
 
   // Apply Gemini AI filtering if enabled
   if (useGeminiFiltering && geminiApiKey && videos.length > 0) {
