@@ -1,79 +1,140 @@
 import { Title } from "@solidjs/meta";
 import { createSignal, onMount } from "solid-js";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, Label } from "~/components/ui";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, Label, Checkbox } from "~/components/ui";
 import { Button } from "~/components/ui";
 import { Input } from "~/components/ui";
-import { Search, Loader2, Key, Eye, EyeOff, X, Loader } from "lucide-solid";
+import { Search, Loader2, Key, Eye, EyeOff, X, Loader, Sparkles } from "lucide-solid";
 import VideoCard, { type Video } from "~/components/video-card";
 import { encryptApiKey, decryptApiKey } from "~/lib/encryption";
-import { getApiKeyFromCookie, saveApiKeyToCookie } from "~/lib/cookie";
+import { getYouTubeApiKeyFromCookie, saveYouTubeApiKeyToCookie, getGeminiApiKeyFromCookie, saveGeminiApiKeyToCookie } from "~/lib/cookie";
 
-const API_KEY_STORAGE_KEY = "youtube_api_key_encrypted";
+const YOUTUBE_API_KEY_STORAGE_KEY = "youtube_api_key_encrypted";
+const GEMINI_API_KEY_STORAGE_KEY = "gemini_api_key_encrypted";
+const USE_GEMINI_FILTERING_KEY = "use_gemini_filtering";
 
 export default function Home() {
-  const [apiKey, setApiKey] = createSignal("");
-  const [showApiKey, setShowApiKey] = createSignal(false);
+  const [youtubeApiKey, setYoutubeApiKey] = createSignal("");
+  const [geminiApiKey, setGeminiApiKey] = createSignal("");
+  const [showYoutubeApiKey, setShowYoutubeApiKey] = createSignal(false);
+  const [showGeminiApiKey, setShowGeminiApiKey] = createSignal(false);
+  const [useGeminiFiltering, setUseGeminiFiltering] = createSignal(false);
   const [searchQuery, setSearchQuery] = createSignal("");
   const [videos, setVideos] = createSignal<Video[]>([]);
   const [loading, setLoading] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
 
-  // Load API key from cookie first, then sessionStorage on mount
+  // Load API keys and settings from storage on mount
   onMount(() => {
     try {
-      // Try cookie first
-      let encrypted = getApiKeyFromCookie();
-
-      // Fallback to sessionStorage if cookie doesn't exist
+      // Load YouTube API key
+      let encrypted = getYouTubeApiKeyFromCookie();
       if (!encrypted) {
-        encrypted = sessionStorage.getItem(API_KEY_STORAGE_KEY);
+        encrypted = sessionStorage.getItem(YOUTUBE_API_KEY_STORAGE_KEY);
       }
-
       if (encrypted) {
         const decrypted = decryptApiKey(encrypted);
         if (decrypted) {
-          setApiKey(decrypted);
+          setYoutubeApiKey(decrypted);
         }
       }
+
+      // Load Gemini API key
+      let geminiEncrypted = getGeminiApiKeyFromCookie();
+      if (!geminiEncrypted) {
+        geminiEncrypted = sessionStorage.getItem(GEMINI_API_KEY_STORAGE_KEY);
+      }
+      if (geminiEncrypted) {
+        const decrypted = decryptApiKey(geminiEncrypted);
+        if (decrypted) {
+          setGeminiApiKey(decrypted);
+        }
+      }
+
+      // Load Gemini filtering preference
+      const useGemini = sessionStorage.getItem(USE_GEMINI_FILTERING_KEY);
+      if (useGemini === "true") {
+        setUseGeminiFiltering(true);
+      }
     } catch (err) {
-      console.error("Failed to load API key from storage:", err);
+      console.error("Failed to load API keys from storage:", err);
     }
   });
 
-  // Save API key to both cookie and sessionStorage when it changes (encrypted)
-  const handleApiKeyChange = (value: string) => {
-    setApiKey(value);
+  // Save YouTube API key to both cookie and sessionStorage when it changes (encrypted)
+  const handleYoutubeApiKeyChange = (value: string) => {
+    setYoutubeApiKey(value);
     try {
       if (value.trim()) {
         const encrypted = encryptApiKey(value);
-        sessionStorage.setItem(API_KEY_STORAGE_KEY, encrypted);
-        saveApiKeyToCookie(encrypted);
+        sessionStorage.setItem(YOUTUBE_API_KEY_STORAGE_KEY, encrypted);
+        saveYouTubeApiKeyToCookie(encrypted);
       } else {
-        sessionStorage.removeItem(API_KEY_STORAGE_KEY);
-        saveApiKeyToCookie("");
+        sessionStorage.removeItem(YOUTUBE_API_KEY_STORAGE_KEY);
+        saveYouTubeApiKeyToCookie("");
       }
     } catch (err) {
-      console.error("Failed to save API key to storage:", err);
+      console.error("Failed to save YouTube API key to storage:", err);
     }
   };
 
-  // Clear API key
-  const handleClearApiKey = () => {
-    setApiKey("");
+  // Save Gemini API key to both cookie and sessionStorage when it changes (encrypted)
+  const handleGeminiApiKeyChange = (value: string) => {
+    setGeminiApiKey(value);
     try {
-      sessionStorage.removeItem(API_KEY_STORAGE_KEY);
-      saveApiKeyToCookie("");
+      if (value.trim()) {
+        const encrypted = encryptApiKey(value);
+        sessionStorage.setItem(GEMINI_API_KEY_STORAGE_KEY, encrypted);
+        saveGeminiApiKeyToCookie(encrypted);
+      } else {
+        sessionStorage.removeItem(GEMINI_API_KEY_STORAGE_KEY);
+        saveGeminiApiKeyToCookie("");
+      }
     } catch (err) {
-      console.error("Failed to clear API key:", err);
+      console.error("Failed to save Gemini API key to storage:", err);
+    }
+  };
+
+  // Toggle Gemini filtering
+  const handleGeminiFilteringToggle = (enabled: boolean) => {
+    setUseGeminiFiltering(enabled);
+    sessionStorage.setItem(USE_GEMINI_FILTERING_KEY, enabled.toString());
+  };
+
+  // Clear YouTube API key
+  const handleClearYoutubeApiKey = () => {
+    setYoutubeApiKey("");
+    try {
+      sessionStorage.removeItem(YOUTUBE_API_KEY_STORAGE_KEY);
+      saveYouTubeApiKeyToCookie("");
+    } catch (err) {
+      console.error("Failed to clear YouTube API key:", err);
+    }
+  };
+
+  // Clear Gemini API key
+  const handleClearGeminiApiKey = () => {
+    setGeminiApiKey("");
+    try {
+      sessionStorage.removeItem(GEMINI_API_KEY_STORAGE_KEY);
+      saveGeminiApiKeyToCookie("");
+    } catch (err) {
+      console.error("Failed to clear Gemini API key:", err);
     }
   };
 
   const handleSearch = async () => {
     const query = searchQuery().trim();
-    const key = apiKey().trim();
+    const youtubeKey = youtubeApiKey().trim();
+    const geminiKey = geminiApiKey().trim();
+    const useGemini = useGeminiFiltering();
 
-    if (!key) {
+    if (!youtubeKey) {
       setError("Please enter your YouTube API key");
+      return;
+    }
+
+    if (useGemini && !geminiKey) {
+      setError("Please enter your Gemini API key to use AI filtering");
       return;
     }
 
@@ -87,7 +148,18 @@ export default function Home() {
     setVideos([]);
 
     try {
-      const response = await fetch(`/api/youtube?q=${encodeURIComponent(query)}&maxResults=50&apiKey=${encodeURIComponent(key)}`);
+      const params = new URLSearchParams({
+        q: query,
+        maxResults: "50",
+        apiKey: youtubeKey,
+      });
+
+      if (useGemini && geminiKey) {
+        params.set("geminiApiKey", geminiKey);
+        params.set("useGeminiFiltering", "true");
+      }
+
+      const response = await fetch(`/api/youtube?${params.toString()}`);
       const data = await response.json();
 
       if (!response.ok) {
@@ -128,7 +200,7 @@ export default function Home() {
             <CardContent class="flex flex-col gap-8">
               <div class="flex flex-col gap-4">
                 <Label
-                  for="api-key"
+                  for="youtube-api-key"
                 >
                   <Key class="h-4 w-4 text-primary" />
                   YouTube API Key
@@ -137,11 +209,12 @@ export default function Home() {
                 <div class="flex flex-row gap-2">
                   <div class="relative flex-1">
                     <Input
-                      type={showApiKey() ? "text" : "password"}
+                      id="youtube-api-key"
+                      type={showYoutubeApiKey() ? "text" : "password"}
                       placeholder="Enter your YouTube Data API v3 key"
                       class="w-full pr-20"
-                      value={apiKey()}
-                      onInput={(e) => handleApiKeyChange(e.currentTarget.value)}
+                      value={youtubeApiKey()}
+                      onInput={(e) => handleYoutubeApiKeyChange(e.currentTarget.value)}
                       disabled={loading()}
                     />
                     <div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
@@ -149,23 +222,23 @@ export default function Home() {
                         type="button"
                         variant="ghost"
                         size="icon"
-                        onClick={() => setShowApiKey(!showApiKey())}
-                        title={showApiKey() ? "Hide API key" : "Show API key"}
+                        onClick={() => setShowYoutubeApiKey(!showYoutubeApiKey())}
+                        title={showYoutubeApiKey() ? "Hide API key" : "Show API key"}
                         disabled={loading()}
                       >
-                        {showApiKey() ? (
+                        {showYoutubeApiKey() ? (
                           <EyeOff class="text-muted-foreground hover:text-foreground" />
                         ) : (
                           <Eye class="text-muted-foreground hover:text-foreground" />
                         )}
                       </Button>
 
-                      {apiKey() && (
+                      {youtubeApiKey() && (
                         <Button
                           type="button"
                           variant="ghost"
                           size="icon"
-                          onClick={handleClearApiKey}
+                          onClick={handleClearYoutubeApiKey}
                           title="Clear API key"
                           disabled={loading()}
                         >
@@ -186,9 +259,92 @@ export default function Home() {
                   >
                     Google Cloud Console
                   </a>
-
                   <span class="text-xs text-muted-foreground">
                     .{" "}We do not store your API key. It is encrypted and stored in your browser locally.
+                  </span>
+                </p>
+              </div>
+
+              <div class="flex flex-col gap-4">
+                <Label
+                  for="gemini-api-key"
+                >
+                  <Sparkles class="h-4 w-4 text-primary" />
+                  Gemini API Key
+                </Label>
+
+                <div class="flex flex-row gap-2">
+                  <div class="relative flex-1">
+                    <Input
+                      id="gemini-api-key"
+                      type={showGeminiApiKey() ? "text" : "password"}
+                      placeholder="Enter your Google Gemini API key"
+                      class="w-full pr-20"
+                      value={geminiApiKey()}
+                      onInput={(e) => handleGeminiApiKeyChange(e.currentTarget.value)}
+                      disabled={loading()}
+                    />
+                    <div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setShowGeminiApiKey(!showGeminiApiKey())}
+                        title={showGeminiApiKey() ? "Hide API key" : "Show API key"}
+                        disabled={loading()}
+                      >
+                        {showGeminiApiKey() ? (
+                          <EyeOff class="text-muted-foreground hover:text-foreground" />
+                        ) : (
+                          <Eye class="text-muted-foreground hover:text-foreground" />
+                        )}
+                      </Button>
+
+                      {geminiApiKey() && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={handleClearGeminiApiKey}
+                          title="Clear API key"
+                          disabled={loading()}
+                        >
+                          <X class="text-muted-foreground hover:text-foreground" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div class="flex items-center gap-2">
+                  <Checkbox
+                    id="use-gemini-filtering"
+                    checked={useGeminiFiltering()}
+                    onChange={(e) => handleGeminiFilteringToggle(e.currentTarget.checked)}
+                    disabled={loading() || !geminiApiKey().trim()}
+                  />
+
+                  <Label
+                    for="use-gemini-filtering"
+                    class="text-sm font-normal cursor-pointer"
+                    selectable={false}
+                  >
+                    Use AI-powered content filtering (requires Gemini API key)
+                  </Label>
+                </div>
+
+                <p class="text-xs text-muted-foreground">
+                  Get your Gemini API key from{" "}
+                  <a
+                    href="https://aistudio.google.com/app/apikey"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="text-primary hover:underline"
+                  >
+                    Google AI Studio
+                  </a>
+                  <span class="text-xs text-muted-foreground">
+                    .{" "}Gemini analyzes video content to identify authentic vs. manufactured content.
                   </span>
                 </p>
               </div>
@@ -203,19 +359,20 @@ export default function Home() {
 
                 <div class="flex flex-row gap-4">
                   <Input
+                    id="search-query"
                     type="text"
                     placeholder="Search for YouTube content..."
                     class="w-full"
                     value={searchQuery()}
                     onInput={(e) => setSearchQuery(e.currentTarget.value)}
                     onKeyPress={handleKeyPress}
-                    disabled={loading() || !apiKey().trim()}
+                    disabled={loading() || !youtubeApiKey().trim()}
                   />
 
                   <Button
                     size="lg"
                     onClick={handleSearch}
-                    disabled={loading() || !apiKey().trim()}
+                    disabled={loading() || !youtubeApiKey().trim()}
                   >
                     {loading() ? (
                       <>

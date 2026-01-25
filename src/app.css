@@ -118,4 +118,9 @@
   .dark .glass-strong {
     background-color: rgba(17, 24, 39, 0.95);
   }
+
+  input[type="checkbox"]:checked {
+    background-color: hsl(217 91% 60%) !important;
+    border-color: hsl(217 91% 60%) !important;
+  }
 }

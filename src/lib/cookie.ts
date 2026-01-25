@@ -1,4 +1,5 @@
-const COOKIE_NAME = "youtube_api_key_encrypted";
+const YOUTUBE_COOKIE_NAME = "youtube_api_key_encrypted";
+const GEMINI_COOKIE_NAME = "gemini_api_key_encrypted";
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
 
 /**
@@ -36,19 +37,37 @@ export function deleteCookie(name: string): void {
 }
 
 /**
- * Get the encrypted API key from cookie
+ * Get the encrypted YouTube API key from cookie
  */
-export function getApiKeyFromCookie(): string | null {
-  return getCookie(COOKIE_NAME);
+export function getYouTubeApiKeyFromCookie(): string | null {
+  return getCookie(YOUTUBE_COOKIE_NAME);
 }
 
 /**
- * Save the encrypted API key to cookie
+ * Save the encrypted YouTube API key to cookie
  */
-export function saveApiKeyToCookie(encrypted: string): void {
+export function saveYouTubeApiKeyToCookie(encrypted: string): void {
   if (encrypted) {
-    setCookie(COOKIE_NAME, encrypted);
+    setCookie(YOUTUBE_COOKIE_NAME, encrypted);
   } else {
-    deleteCookie(COOKIE_NAME);
+    deleteCookie(YOUTUBE_COOKIE_NAME);
+  }
+}
+
+/**
+ * Get the encrypted Gemini API key from cookie
+ */
+export function getGeminiApiKeyFromCookie(): string | null {
+  return getCookie(GEMINI_COOKIE_NAME);
+}
+
+/**
+ * Save the encrypted Gemini API key to cookie
+ */
+export function saveGeminiApiKeyToCookie(encrypted: string): void {
+  if (encrypted) {
+    setCookie(GEMINI_COOKIE_NAME, encrypted);
+  } else {
+    deleteCookie(GEMINI_COOKIE_NAME);
   }
 }
