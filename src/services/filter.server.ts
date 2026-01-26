@@ -222,7 +222,7 @@ function analyzeDescription(description: string): number {
 /**
  * Analyze video using custom AI logic with feedback-based learning
  */
-export async function analyzeVideo(video: Video, patterns?: VideoPatterns): Promise<VideoAnalysisResult> {
+export async function analyzeVideo(video: Video, patterns?: VideoPatterns, authenticityThreshold: number = 0.4): Promise<VideoAnalysisResult> {
   let score = 0.5; // Start with neutral score
   const reasons: string[] = [];
   
@@ -290,12 +290,15 @@ export async function analyzeVideo(video: Video, patterns?: VideoPatterns): Prom
       }
     }
     
-    // Check channel matches
+    // Check channel matches - negative channels get strong penalty
     if (patterns.positiveChannels.includes(video.channelTitle)) {
       positiveMatches += 2; // Channel match is stronger
     }
     if (patterns.negativeChannels.includes(video.channelTitle)) {
-      negativeMatches += 2;
+      // Strong penalty for disliked channels - make them much less likely to appear
+      negativeMatches += 5; // Much stronger penalty for channel match
+      score -= 0.3; // Direct score penalty for disliked channels
+      reasons.push(`Channel "${video.channelTitle}" is in your disliked channels`);
     }
     
     // Apply feedback-based scoring
@@ -313,8 +316,8 @@ export async function analyzeVideo(video: Video, patterns?: VideoPatterns): Prom
   // Normalize score to 0-1 range
   score = Math.max(0, Math.min(1, score));
   
-  // Determine if authentic (threshold: 0.4)
-  const isAuthentic = score >= 0.4;
+  // Determine if authentic using configurable threshold
+  const isAuthentic = score >= authenticityThreshold;
   
   return {
     videoId: video.id,
@@ -327,13 +330,13 @@ export async function analyzeVideo(video: Video, patterns?: VideoPatterns): Prom
 /**
  * Analyze multiple videos with feedback-based learning
  */
-export async function analyzeVideos(videos: Video[]): Promise<VideoAnalysisResult[]> {
+export async function analyzeVideos(videos: Video[], authenticityThreshold: number = 0.4): Promise<VideoAnalysisResult[]> {
   const patterns = await loadFeedbackPatterns();
   
   const results: VideoAnalysisResult[] = [];
   
   for (const video of videos) {
-    const result = await analyzeVideo(video, patterns);
+    const result = await analyzeVideo(video, patterns, authenticityThreshold);
     results.push(result);
   }
   
@@ -343,10 +346,11 @@ export async function analyzeVideos(videos: Video[]): Promise<VideoAnalysisResul
 /**
  * Filter videos based on analysis results
  */
-export function filterVideosByAnalysis(
+export async function filterVideosByAnalysis(
   videos: Video[],
-  analysisResults: VideoAnalysisResult[]
-): Video[] {
+  analysisResults: VideoAnalysisResult[],
+  authenticityThreshold: number = 0.4
+): Promise<Video[]> {
   const analysisMap = new Map<string, VideoAnalysisResult>();
   for (const result of analysisResults) {
     if (result.videoId) {
@@ -354,7 +358,22 @@ export function filterVideosByAnalysis(
     }
   }
 
+  // Get disliked channels to filter them out more aggressively
+  const { getNegativeFeedbackWithMetadata } = await import("./feedback.server");
+  const negativeFeedback = await getNegativeFeedbackWithMetadata();
+  const dislikedChannels = new Set<string>();
+  for (const metadata of negativeFeedback.values()) {
+    if (metadata.channelTitle) {
+      dislikedChannels.add(metadata.channelTitle);
+    }
+  }
+
   return videos.filter((video) => {
+    // Strongly filter out videos from disliked channels
+    if (dislikedChannels.has(video.channelTitle)) {
+      return false; // Exclude videos from disliked channels
+    }
+
     const analysis = analysisMap.get(video.id);
     // Only filter if explicitly marked as NOT authentic (isAuthentic === false)
     // Include if: authentic (true), not analyzed (undefined), or missing analysis

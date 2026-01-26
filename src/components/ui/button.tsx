@@ -3,7 +3,7 @@ import { cn } from "~/lib/utils";
 
 export interface ButtonProps extends JSX.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: "default" | "secondary" | "outline" | "ghost" | "destructive";
-  size?: "default" | "sm" | "lg" | "icon";
+  size?: "default" | "xs" | "sm" | "lg" | "icon";
 }
 
 const Button: Component<ButtonProps> = (props) => {
@@ -19,6 +19,7 @@ const Button: Component<ButtonProps> = (props) => {
 
   const sizeClasses = {
     default: "min-h-11 px-5 text-base font-medium leading-6",
+    xs: "min-h-8 px-3 text-xs font-medium leading-5",
     sm: "min-h-11 px-4 text-sm font-medium leading-5",
     lg: "min-h-12 px-6 text-lg font-semibold leading-7",
     icon: "h-11 w-11",

@@ -3,13 +3,24 @@ import { createSignal, onMount } from "solid-js";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Label, Checkbox } from "~/components/ui";
 import { Button } from "~/components/ui";
 import { Input } from "~/components/ui";
-import { Search, Loader2, Key, Eye, EyeOff, X, Loader, Brain, Save } from "lucide-solid";
+import { Search, Loader2, Key, Eye, EyeOff, X, Loader, Brain, Save, Heart, Plus, Settings } from "lucide-solid";
 import VideoCard, { type Video } from "~/components/video-card";
 import { encryptApiKey, decryptApiKey } from "~/lib/encryption";
 import { getYouTubeApiKeyFromCookie, saveYouTubeApiKeyToCookie } from "~/lib/cookie";
 
 const YOUTUBE_API_KEY_STORAGE_KEY = "youtube_api_key_encrypted";
 const USE_CUSTOM_FILTERING_KEY = "use_custom_filtering";
+const FILTER_SETTINGS_KEY = "filter_settings";
+
+interface FilterSettings {
+  authenticityThreshold: number; // 0-1, default 0.4
+  maxPagesToSearch: number; // default 20
+  maxTotalVideosToFetch: number; // default 1000
+  minVideoDurationSeconds: number; // default 60
+}
+
+// Module-level flag to track if component has been mounted before (for HMR)
+let hasMountedBefore = false;
 
 export default function Home() {
   const [youtubeApiKey, setYoutubeApiKey] = createSignal("");
@@ -19,13 +30,33 @@ export default function Home() {
   const [videos, setVideos] = createSignal<Video[]>([]);
   const [loading, setLoading] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
+  const [favoriteVideoUrl, setFavoriteVideoUrl] = createSignal("");
+  const [addingFavorite, setAddingFavorite] = createSignal(false);
+  const [showSettings, setShowSettings] = createSignal(false);
+  // YouTube API quota limits:
+  // - Default daily quota: 10,000 units
+  // - search.list: 100 units per request
+  // - videos.list: 1 unit per request (up to 50 videos)
+  // - Each page: ~101 units (1 search + 1 videos.list)
+  // - Max pages per day: ~99 pages (10,000 / 101)
+  // - Max videos per day: ~4,950 videos (99 pages * 50)
+  // Defaults are conservative to allow multiple searches per day
+  const [filterSettings, setFilterSettings] = createSignal<FilterSettings>({
+    authenticityThreshold: 0.4,
+    maxPagesToSearch: 20, // ~2,020 units per search (allows ~4-5 searches per day)
+    maxTotalVideosToFetch: 1000, // Conservative limit per search
+    minVideoDurationSeconds: 60,
+  });
 
   // Load API keys and settings from storage on mount
   onMount(() => {
-    // Clear search query on mount to prevent stale values on hot reload
-    setSearchQuery("");
-    setError(null);
-    setVideos([]);
+    // Only clear error and videos on actual page load, not on hot reload
+    // This prevents search results from disappearing during HMR
+    if (!hasMountedBefore) {
+      setError(null);
+      setVideos([]);
+      hasMountedBefore = true;
+    }
 
     try {
       // Load YouTube API key
@@ -44,6 +75,27 @@ export default function Home() {
       const useCustom = sessionStorage.getItem(USE_CUSTOM_FILTERING_KEY);
       if (useCustom !== null) {
         setUseCustomFiltering(useCustom === "true");
+      }
+
+      // Load filter settings
+      const settingsJson = sessionStorage.getItem(FILTER_SETTINGS_KEY);
+      if (settingsJson) {
+        try {
+          const settings = JSON.parse(settingsJson) as FilterSettings;
+          // Clamp values to respect YouTube API quota limits
+          const clampedSettings: FilterSettings = {
+            ...settings,
+            maxPagesToSearch: Math.min(Math.max(1, settings.maxPagesToSearch || 20), 95),
+            maxTotalVideosToFetch: Math.min(Math.max(50, settings.maxTotalVideosToFetch || 1000), 4750),
+            minVideoDurationSeconds: Math.min(Math.max(0, settings.minVideoDurationSeconds || 60), 600),
+            authenticityThreshold: Math.min(Math.max(0, settings.authenticityThreshold || 0.4), 1),
+          };
+          setFilterSettings(clampedSettings);
+          // Save clamped values back to storage
+          sessionStorage.setItem(FILTER_SETTINGS_KEY, JSON.stringify(clampedSettings));
+        } catch (err) {
+          console.error("Failed to parse filter settings:", err);
+        }
       }
     } catch (err) {
       console.error("Failed to load API keys from storage:", err);
@@ -78,6 +130,17 @@ export default function Home() {
     sessionStorage.setItem(USE_CUSTOM_FILTERING_KEY, enabled.toString());
   };
 
+  // Update filter settings
+  const handleFilterSettingsChange = (key: keyof FilterSettings, value: number) => {
+    const newSettings = { ...filterSettings(), [key]: value };
+    setFilterSettings(newSettings);
+    try {
+      sessionStorage.setItem(FILTER_SETTINGS_KEY, JSON.stringify(newSettings));
+    } catch (err) {
+      console.error("Failed to save filter settings:", err);
+    }
+  };
+
   // Clear YouTube API key
   const handleClearYoutubeApiKey = () => {
     setYoutubeApiKey("");
@@ -89,11 +152,65 @@ export default function Home() {
     }
   };
 
+  // Add favorite video by URL
+  const handleAddFavoriteVideo = async () => {
+    const url = favoriteVideoUrl().trim();
+    const youtubeKey = youtubeApiKey().trim();
+
+    if (!url) {
+      setError("Please enter a YouTube URL or video ID");
+      return;
+    }
+
+    if (!youtubeKey) {
+      setError("Please enter your YouTube API key first");
+      return;
+    }
+
+    setAddingFavorite(true);
+    setError(null);
+
+    try {
+      const response = await fetch("/api/add-video", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          url,
+          apiKey: youtubeKey,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || errorData.message || "Failed to add video");
+      }
+
+      const data = await response.json();
+      setFavoriteVideoUrl("");
+      setError(null);
+      // Show success message (you could add a success state if needed)
+      console.log("Video added to favorites:", data.video.title);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to add video to favorites");
+    } finally {
+      setAddingFavorite(false);
+    }
+  };
+
 
   const handleSearch = async () => {
-    const query = searchQuery().trim();
+    // Get the actual value from the input element to handle SSR hydration issues
+    const inputElement = document.getElementById("search-query") as HTMLInputElement;
+    const query = inputElement ? inputElement.value.trim() : searchQuery().trim();
     const youtubeKey = youtubeApiKey().trim();
     const useCustom = useCustomFiltering();
+
+    // Sync the input value back to the signal if there's a mismatch
+    if (inputElement && inputElement.value !== searchQuery()) {
+      setSearchQuery(inputElement.value);
+    }
 
     if (!youtubeKey) {
       setError("Please enter your YouTube API key");
@@ -121,6 +238,13 @@ export default function Home() {
       } else {
         params.set("useCustomFiltering", "false");
       }
+
+      // Add filter settings to request
+      const settings = filterSettings();
+      params.set("authenticityThreshold", settings.authenticityThreshold.toString());
+      params.set("maxPagesToSearch", settings.maxPagesToSearch.toString());
+      params.set("maxTotalVideosToFetch", settings.maxTotalVideosToFetch.toString());
+      params.set("minVideoDurationSeconds", settings.minVideoDurationSeconds.toString());
 
       const response = await fetch(`/api/youtube?${params.toString()}`);
 
@@ -264,28 +388,198 @@ export default function Home() {
                 </p>
               </div>
 
-              <div class="flex flex-col gap-4">
-                <div class="flex items-center gap-2">
-                  <Checkbox
-                    id="use-custom-filtering"
-                    checked={useCustomFiltering()}
-                    onChange={(e) => handleCustomFilteringToggle(e.currentTarget.checked)}
-                    disabled={loading()}
-                  />
+              <div class="flex flex-col gap-2">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-2">
+                    <Checkbox
+                      id="use-custom-filtering"
+                      checked={useCustomFiltering()}
+                      onChange={(e) => handleCustomFilteringToggle(e.currentTarget.checked)}
+                      disabled={loading()}
+                    />
 
-                  <Label
-                    for="use-custom-filtering"
-                    class="text-sm font-normal cursor-pointer"
-                    selectable={false}
+                    <Label
+                      for="use-custom-filtering"
+                      class="text-sm font-normal cursor-pointer"
+                      selectable={false}
+                    >
+                      <Brain class="h-4 w-4 text-primary inline" />
+                      Use AI-powered content filtering
+                    </Label>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="xs"
+                    onClick={() => setShowSettings(!showSettings())}
+                    disabled={loading()}
+                    class="flex items-center gap-2"
                   >
-                    <Brain class="h-4 w-4 text-primary inline" />
-                    Use AI-powered content filtering
-                  </Label>
+                    <Settings size={16} />
+                    <span>Settings</span>
+                  </Button>
                 </div>
 
                 <p class="text-xs text-muted-foreground">
                   Our custom AI filter analyzes video titles, descriptions, and engagement metrics to identify authentic, high-quality content versus "slop" or manufactured content. The filter learns from your feedback to improve over time.
                 </p>
+
+                {showSettings() && (
+                  <div class="p-4 border border-border rounded-lg bg-muted/50 flex flex-col gap-4">
+                    <Label>
+                      <Settings class="h-4 w-4 text-primary inline mr-1" />
+                      Filter Settings
+                    </Label>
+
+                    <div class="flex flex-col gap-3">
+                      <div class="flex flex-col gap-2">
+                        <Label for="authenticity-threshold" class="text-sm">
+                          Authenticity Threshold: {filterSettings().authenticityThreshold.toFixed(2)}
+                        </Label>
+                        <div class="relative w-full">
+                          <Input
+                            id="authenticity-threshold"
+                            type="range"
+                            min="0"
+                            max="1"
+                            step="0.05"
+                            value={filterSettings().authenticityThreshold}
+                            onInput={(e) => {
+                              const value = parseFloat(e.currentTarget.value);
+                              handleFilterSettingsChange("authenticityThreshold", value);
+                              // Update the fill percentage
+                              const percentage = (value / 1) * 100;
+                              e.currentTarget.style.setProperty("--fill-percentage", `${percentage}%`);
+                            }}
+                            disabled={loading()}
+                            class="slider-with-fill"
+                            style={`--fill-percentage: ${(filterSettings().authenticityThreshold / 1) * 100}%`}
+                          />
+                        </div>
+                        <p class="text-xs text-muted-foreground">
+                          Lower = more lenient (0.0-1.0). Videos below this score are filtered out.
+                        </p>
+                      </div>
+
+                      <div class="flex flex-col gap-2">
+                        <Label for="max-pages" class="text-sm">
+                          Max Pages to Search: {filterSettings().maxPagesToSearch}
+                        </Label>
+                        <Input
+                          id="max-pages"
+                          type="number"
+                          min="1"
+                          max="95"
+                          value={filterSettings().maxPagesToSearch}
+                          onInput={(e) => {
+                            const value = parseInt(e.currentTarget.value) || 20;
+                            const maxAllowed = 95; // YouTube API quota limit
+                            const clampedValue = Math.max(1, Math.min(value, maxAllowed));
+                            if (clampedValue !== filterSettings().maxPagesToSearch) {
+                              handleFilterSettingsChange("maxPagesToSearch", clampedValue);
+                            }
+                          }}
+                          disabled={loading()}
+                        />
+                        <p class="text-xs text-muted-foreground">
+                          Maximum number of pages to search (each page costs ~101 API units). Max 95 pages to respect YouTube API daily quota (10,000 units).
+                        </p>
+                      </div>
+
+                      <div class="flex flex-col gap-2">
+                        <Label for="max-total-videos" class="text-sm">
+                          Max Total Videos to Fetch: {filterSettings().maxTotalVideosToFetch}
+                        </Label>
+                        <Input
+                          id="max-total-videos"
+                          type="number"
+                          min="50"
+                          max="4750"
+                          step="50"
+                          value={filterSettings().maxTotalVideosToFetch}
+                          onInput={(e) => {
+                            const value = parseInt(e.currentTarget.value) || 1000;
+                            const maxAllowed = 4750; // YouTube API quota limit (95 pages * 50 videos)
+                            const clampedValue = Math.max(50, Math.min(value, maxAllowed));
+                            if (clampedValue !== filterSettings().maxTotalVideosToFetch) {
+                              handleFilterSettingsChange("maxTotalVideosToFetch", clampedValue);
+                            }
+                          }}
+                          disabled={loading()}
+                        />
+                        <p class="text-xs text-muted-foreground">
+                          Maximum total videos to fetch (max 4,750 to respect YouTube API daily quota of 10,000 units).
+                        </p>
+                      </div>
+
+                      <div class="flex flex-col gap-2">
+                        <Label for="min-duration" class="text-sm">
+                          Minimum Video Duration (seconds): {filterSettings().minVideoDurationSeconds}
+                        </Label>
+                        <Input
+                          id="min-duration"
+                          type="number"
+                          min="0"
+                          max="600"
+                          step="10"
+                          value={filterSettings().minVideoDurationSeconds}
+                          onInput={(e) => {
+                            const value = parseInt(e.currentTarget.value) || 60;
+                            const clampedValue = Math.max(0, Math.min(value, 600));
+                            if (clampedValue !== filterSettings().minVideoDurationSeconds) {
+                              handleFilterSettingsChange("minVideoDurationSeconds", clampedValue);
+                            }
+                          }}
+                          disabled={loading()}
+                        />
+                        <p class="text-xs text-muted-foreground">
+                          Videos shorter than this duration (e.g., Shorts) are automatically filtered out.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div class="flex flex-col gap-4">
+                <Label for="favorite-video-url">
+                  <Heart class="h-4 w-4 text-primary" />
+                  Add Favorite Video
+                </Label>
+                <p class="text-xs text-muted-foreground">
+                  Paste a YouTube URL or video ID to add it to your favorites. This helps the AI learn your preferences.
+                </p>
+                <div class="flex flex-row gap-2">
+                  <Input
+                    id="favorite-video-url"
+                    type="text"
+                    placeholder="https://www.youtube.com/watch?v=..."
+                    class="flex-1"
+                    value={favoriteVideoUrl()}
+                    onInput={(e) => setFavoriteVideoUrl(e.currentTarget.value)}
+                    disabled={addingFavorite() || loading()}
+                    onKeyPress={(e) => {
+                      if (e.key === "Enter") {
+                        handleAddFavoriteVideo();
+                      }
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="default"
+                    size="default"
+                    onClick={handleAddFavoriteVideo}
+                    disabled={addingFavorite() || loading() || !favoriteVideoUrl().trim() || !youtubeApiKey().trim()}
+                    class="flex items-center gap-2"
+                  >
+                    {addingFavorite() ? (
+                      <Loader class="animate-spin" size={16} />
+                    ) : (
+                      <Plus size={16} />
+                    )}
+                    <span>Add</span>
+                  </Button>
+                </div>
               </div>
 
               <div class="flex flex-col gap-4">

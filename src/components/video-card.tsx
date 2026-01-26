@@ -36,7 +36,10 @@ const VideoCard: Component<VideoCardProps> = (props) => {
     }
   });
 
-  const handleFeedback = async (action: "like" | "dislike") => {
+  const handleFeedback = async (action: "like" | "dislike", event: MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    
     if (isSubmitting()) return;
 
     // If clicking the same button, remove feedback
@@ -148,16 +151,12 @@ const VideoCard: Component<VideoCardProps> = (props) => {
         </CardContent>
       </a>
       
-      <div class="px-4 pb-4 flex items-center gap-2">
+      <div class="px-4 pb-4 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
         <Button
           type="button"
           variant={feedbackStatus() === "positive" ? "default" : "outline"}
           size="sm"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            handleFeedback("like");
-          }}
+          onClick={(e) => handleFeedback("like", e)}
           disabled={isSubmitting()}
           class="flex-1"
         >
@@ -168,11 +167,7 @@ const VideoCard: Component<VideoCardProps> = (props) => {
           type="button"
           variant={feedbackStatus() === "negative" ? "destructive" : "outline"}
           size="sm"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            handleFeedback("dislike");
-          }}
+          onClick={(e) => handleFeedback("dislike", e)}
           disabled={isSubmitting()}
           class="flex-1"
         >

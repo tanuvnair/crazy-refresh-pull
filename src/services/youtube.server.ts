@@ -46,21 +46,26 @@ function parseDuration(duration: string): number {
  * Search YouTube videos with pagination support
  * @param maxResults - Maximum number of videos to return after filtering
  * @param initialFetchCount - Target number of videos to fetch from YouTube API (before filtering)
+ * @param pageToken - Optional page token for pagination
  */
 export async function searchYouTubeVideos(
   query: string,
   apiKey: string,
   maxResults: number = 50,
-  initialFetchCount: number = 300
-): Promise<Video[]> {
+  initialFetchCount: number = 300,
+  pageToken?: string,
+  minVideoDurationSeconds: number = 60
+): Promise<{ videos: Video[]; nextPageToken?: string }> {
   const YOUTUBE_API_MAX_PER_REQUEST = 50;
   const allVideos: Video[] = [];
-  let nextPageToken: string | undefined = undefined;
+  let currentPageToken: string | undefined = pageToken;
   let totalFetched = 0;
   const maxFetchAttempts = initialFetchCount; // Maximum videos to fetch from API
   
-  // Fetch multiple pages if needed to get enough videos after filtering
-  // Continue until we have enough videos OR we've fetched the max OR no more pages
+  // Fetch a single page or multiple pages if needed
+  // If pageToken is provided, fetch only one page. Otherwise, fetch until we have enough.
+  const fetchSinglePage = pageToken !== undefined;
+  
   while (allVideos.length < maxResults && totalFetched < maxFetchAttempts) {
     const searchUrl = new URL("https://www.googleapis.com/youtube/v3/search");
     searchUrl.searchParams.set("part", "snippet");
@@ -70,8 +75,8 @@ export async function searchYouTubeVideos(
     searchUrl.searchParams.set("order", "relevance");
     searchUrl.searchParams.set("key", apiKey);
     
-    if (nextPageToken) {
-      searchUrl.searchParams.set("pageToken", nextPageToken);
+    if (currentPageToken) {
+      searchUrl.searchParams.set("pageToken", currentPageToken);
     }
 
     const searchResponse = await fetch(searchUrl.toString());
@@ -81,14 +86,34 @@ export async function searchYouTubeVideos(
         const contentType = searchResponse.headers.get("content-type");
         if (contentType && contentType.includes("application/json")) {
           const errorData = await searchResponse.json();
-          error = errorData.error?.message || JSON.stringify(errorData);
+          // Extract the actual error message from YouTube API response
+          if (errorData.error) {
+            error = errorData.error.message || errorData.error.errors?.[0]?.message || JSON.stringify(errorData.error);
+          } else {
+            error = JSON.stringify(errorData);
+          }
         } else {
           error = await searchResponse.text();
         }
       } catch {
         error = `HTTP ${searchResponse.status}: ${searchResponse.statusText}`;
       }
-      throw new Error(`YouTube API error: ${error}`);
+      
+      // Provide more user-friendly error messages for common cases
+      let userFriendlyError = error;
+      if (error.includes("API key not valid") || error.includes("Invalid API key") || error.includes("keyInvalid")) {
+        userFriendlyError = "Invalid YouTube API key. Please check your API key and try again.";
+      } else if (error.includes("quota") || error.includes("quotaExceeded") || error.includes("dailyLimitExceeded")) {
+        userFriendlyError = "YouTube API quota exceeded. The daily quota for your API key has been reached. Please try again tomorrow or upgrade your quota in the Google Cloud Console.";
+      } else if (error.includes("403") || error.includes("Forbidden")) {
+        userFriendlyError = "Access denied. Please check your YouTube API key permissions and ensure the YouTube Data API v3 is enabled.";
+      } else if (error.includes("400") || error.includes("Bad Request")) {
+        userFriendlyError = `Invalid request: ${error}`;
+      } else if (error.includes("401") || error.includes("Unauthorized")) {
+        userFriendlyError = "Unauthorized. Please verify your YouTube API key is correct.";
+      }
+      
+      throw new Error(userFriendlyError);
     }
 
     let searchData: YouTubeSearchResponse;
@@ -103,7 +128,7 @@ export async function searchYouTubeVideos(
     }
 
     // Update pagination token
-    nextPageToken = searchData.nextPageToken;
+    currentPageToken = searchData.nextPageToken;
     totalFetched += searchData.items.length;
 
     // Get video IDs to fetch statistics and content details
@@ -156,9 +181,9 @@ export async function searchYouTubeVideos(
       const description = item.snippet.description;
       const channelTitle = item.snippet.channelTitle;
 
-      // Filter out Shorts (videos shorter than 60 seconds)
+      // Filter out Shorts (videos shorter than configured minimum duration)
       // Content quality filtering is handled by custom AI filter if enabled
-      if (duration === undefined || duration < 60) {
+      if (duration === undefined || duration < minVideoDurationSeconds) {
         continue;
       }
 
@@ -181,13 +206,89 @@ export async function searchYouTubeVideos(
       }
     }
 
-    // Stop if no more pages available
-    if (!nextPageToken) {
+    // Stop if no more pages available or if we're only fetching a single page
+    if (!currentPageToken || fetchSinglePage) {
       break;
     }
   }
 
-  return allVideos;
+  return { videos: allVideos, nextPageToken: currentPageToken };
+}
+
+/**
+ * Fetch video details by video ID
+ */
+export async function getVideoById(videoId: string, apiKey: string): Promise<Video | null> {
+  try {
+    // Fetch video details
+    const detailsUrl = new URL("https://www.googleapis.com/youtube/v3/videos");
+    detailsUrl.searchParams.set("part", "snippet,statistics,contentDetails");
+    detailsUrl.searchParams.set("id", videoId);
+    detailsUrl.searchParams.set("key", apiKey);
+
+    const response = await fetch(detailsUrl.toString());
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json();
+    if (!data.items || data.items.length === 0) {
+      return null;
+    }
+
+    const item = data.items[0];
+    const duration = item.contentDetails?.duration 
+      ? parseDuration(item.contentDetails.duration) 
+      : undefined;
+
+    // Filter out Shorts (default 60 seconds, but this function doesn't have access to settings)
+    // This is used for adding favorites, so we'll use a reasonable default
+    if (duration !== undefined && duration < 60) {
+      return null;
+    }
+
+    return {
+      id: item.id,
+      title: item.snippet.title,
+      description: item.snippet.description,
+      thumbnail: item.snippet.thumbnails.high?.url || item.snippet.thumbnails.medium.url,
+      channelTitle: item.snippet.channelTitle,
+      publishedAt: item.snippet.publishedAt,
+      viewCount: item.statistics?.viewCount,
+      likeCount: item.statistics?.likeCount,
+      url: `https://www.youtube.com/watch?v=${item.id}`,
+    };
+  } catch (error) {
+    console.error("Failed to fetch video by ID:", error);
+    return null;
+  }
+}
+
+/**
+ * Extract video ID from YouTube URL
+ */
+export function extractVideoIdFromUrl(url: string): string | null {
+  try {
+    const urlObj = new URL(url);
+    
+    // Handle different YouTube URL formats
+    if (urlObj.hostname.includes("youtube.com")) {
+      return urlObj.searchParams.get("v");
+    } else if (urlObj.hostname.includes("youtu.be")) {
+      return urlObj.pathname.slice(1);
+    }
+    
+    // If it's already just an ID
+    if (/^[a-zA-Z0-9_-]{11}$/.test(url.trim())) {
+      return url.trim();
+    }
+    
+    return null;
+  } catch {
+    // If URL parsing fails, try to extract ID directly
+    const match = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+    return match ? match[1] : null;
+  }
 }
 
 export interface SearchVideosOptions {
@@ -195,6 +296,10 @@ export interface SearchVideosOptions {
   youtubeApiKey: string;
   maxResults?: number;
   useCustomFiltering?: boolean;
+  authenticityThreshold?: number;
+  maxPagesToSearch?: number;
+  maxTotalVideosToFetch?: number;
+  minVideoDurationSeconds?: number;
 }
 
 export interface SearchVideosResult {
@@ -212,12 +317,29 @@ export async function handleYouTubeSearchRequest(request: Request): Promise<Resp
     const maxResults = parseInt(url.searchParams.get("maxResults") || "10", 10);
     const apiKey = url.searchParams.get("apiKey") || process.env.YOUTUBE_API_KEY || "";
     const useCustomFiltering = url.searchParams.get("useCustomFiltering") !== "false"; // Default to true
+    
+    // Get filter settings from query params
+    // YouTube API quota limits: 10,000 units/day, ~101 units per page (100 for search + 1 for videos.list)
+    const authenticityThreshold = parseFloat(url.searchParams.get("authenticityThreshold") || "0.4");
+    let maxPagesToSearch = parseInt(url.searchParams.get("maxPagesToSearch") || "20", 10);
+    let maxTotalVideosToFetch = parseInt(url.searchParams.get("maxTotalVideosToFetch") || "1000", 10);
+    const minVideoDurationSeconds = parseInt(url.searchParams.get("minVideoDurationSeconds") || "60", 10);
+    
+    // Enforce YouTube API quota limits
+    // Max ~99 pages per day (10,000 units / 101 units per page), use 95 as safe limit
+    maxPagesToSearch = Math.min(maxPagesToSearch, 95);
+    // Max ~4,750 videos per day (95 pages * 50 videos per page)
+    maxTotalVideosToFetch = Math.min(maxTotalVideosToFetch, 4750);
 
     const result = await searchVideosWithFiltering({
       query,
       youtubeApiKey: apiKey,
       maxResults,
       useCustomFiltering,
+      authenticityThreshold,
+      maxPagesToSearch,
+      maxTotalVideosToFetch,
+      minVideoDurationSeconds,
     });
 
     return new Response(JSON.stringify(result), {
@@ -226,12 +348,16 @@ export async function handleYouTubeSearchRequest(request: Request): Promise<Resp
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    const statusCode = errorMessage.includes("required") ? 400 : 500;
+    const statusCode = errorMessage.includes("required") || errorMessage.includes("API key") ? 400 : 500;
+    
+    // Log the full error for debugging
+    console.error("YouTube search error:", error);
 
     return new Response(
       JSON.stringify({
         error: "Failed to fetch YouTube videos",
         message: errorMessage,
+        details: error instanceof Error ? error.stack : undefined,
       }),
       {
         status: statusCode,
@@ -244,11 +370,21 @@ export async function handleYouTubeSearchRequest(request: Request): Promise<Resp
 /**
  * Search YouTube videos with optional custom AI filtering
  * This is the main business logic function that orchestrates the entire search flow
+ * Continues fetching pages until we have enough results after filtering
  */
 export async function searchVideosWithFiltering(
   options: SearchVideosOptions
 ): Promise<SearchVideosResult> {
-  const { query, youtubeApiKey, maxResults = 50, useCustomFiltering = true } = options;
+  const { 
+    query, 
+    youtubeApiKey, 
+    maxResults = 50, 
+    useCustomFiltering = true,
+    authenticityThreshold = 0.4,
+    maxPagesToSearch = 20,
+    maxTotalVideosToFetch = 1000,
+    minVideoDurationSeconds = 60,
+  } = options;
 
   // Validate inputs
   if (!query || query.trim().length === 0) {
@@ -259,52 +395,84 @@ export async function searchVideosWithFiltering(
     throw new Error("YouTube API key is required");
   }
 
-  // Search and filter videos using YouTube service
-  // Fetch more videos initially (300) to account for filtering, then return maxResults
-  let videos = await searchYouTubeVideos(query, youtubeApiKey, maxResults, 300);
+  const MAX_TOTAL_FETCH = maxTotalVideosToFetch;
+  const VIDEOS_PER_PAGE = 50; // YouTube API max per request
+  let allFetchedVideos: Video[] = [];
+  let nextPageToken: string | undefined = undefined;
+  let totalFetched = 0;
+  let pageCount = 0;
+  const MAX_PAGES = maxPagesToSearch;
 
-  // Filter out videos that are already in feedback (repeats)
-  try {
-    const { getPositiveFeedback, getNegativeFeedback } = await import("./feedback.server");
-    const positiveFeedback = await getPositiveFeedback();
-    const negativeFeedback = await getNegativeFeedback();
-    const allFeedbackIds = new Set([...positiveFeedback, ...negativeFeedback]);
+  // Keep fetching pages until we have enough results after filtering
+  while (allFetchedVideos.length < maxResults && totalFetched < MAX_TOTAL_FETCH && pageCount < MAX_PAGES) {
+    pageCount++;
     
-    const videosBeforeRepeatFiltering = videos.length;
-    videos = videos.filter((video) => !allFeedbackIds.has(video.id));
-    const repeatFilteredCount = videosBeforeRepeatFiltering - videos.length;
+    // Fetch a single page of videos
+    const pageResult = await searchYouTubeVideos(query, youtubeApiKey, VIDEOS_PER_PAGE, VIDEOS_PER_PAGE, nextPageToken, minVideoDurationSeconds);
+    const pageVideos = pageResult.videos;
+    nextPageToken = pageResult.nextPageToken;
     
-    if (repeatFilteredCount > 0) {
-      console.log(`Repeat filtering: ${repeatFilteredCount} video(s) filtered out (already in feedback)`);
+    if (pageVideos.length === 0) {
+      // No more videos available
+      break;
     }
-  } catch (feedbackError) {
-    console.warn("Failed to load feedback for repeat filtering:", feedbackError);
-    // Continue without repeat filtering if it fails
-  }
+    
+    totalFetched += pageVideos.length;
 
-  // Apply custom AI filtering if enabled
-  if (useCustomFiltering && videos.length > 0) {
+    // Filter out videos that are already in feedback (repeats)
+    let filteredPageVideos = pageVideos;
     try {
-      const videosBeforeFiltering = videos.length;
-      const { analyzeVideos, filterVideosByAnalysis } = await import("./filter.server");
-      const analysisResults = await analyzeVideos(videos);
-      videos = filterVideosByAnalysis(videos, analysisResults);
-      const videosAfterFiltering = videos.length;
-      const filteredCount = videosBeforeFiltering - videosAfterFiltering;
+      const { getPositiveFeedback, getNegativeFeedback } = await import("./feedback.server");
+      const positiveFeedback = await getPositiveFeedback();
+      const negativeFeedback = await getNegativeFeedback();
+      const allFeedbackIds = new Set([...positiveFeedback, ...negativeFeedback]);
       
-      if (filteredCount > 0) {
-        console.log(`Custom AI filtering applied: ${filteredCount} video(s) filtered out (${videosBeforeFiltering} → ${videosAfterFiltering})`);
-      } else {
-        console.log(`Custom AI filtering applied: All ${videosBeforeFiltering} video(s) passed the authenticity check`);
+      filteredPageVideos = pageVideos.filter((video) => !allFeedbackIds.has(video.id));
+    } catch (feedbackError) {
+      console.warn("Failed to load feedback for repeat filtering:", feedbackError);
+      // Continue without repeat filtering if it fails
+    }
+
+    // Apply custom AI filtering if enabled
+    if (useCustomFiltering && filteredPageVideos.length > 0) {
+      try {
+        const videosBeforeFiltering = filteredPageVideos.length;
+        const { analyzeVideos, filterVideosByAnalysis } = await import("./filter.server");
+        const analysisResults = await analyzeVideos(filteredPageVideos, authenticityThreshold);
+        filteredPageVideos = await filterVideosByAnalysis(filteredPageVideos, analysisResults, authenticityThreshold);
+        const videosAfterFiltering = filteredPageVideos.length;
+        
+        if (pageCount > 1 || videosAfterFiltering < maxResults) {
+          console.log(`Page ${pageCount}: ${videosBeforeFiltering} → ${videosAfterFiltering} videos after filtering (${allFetchedVideos.length + videosAfterFiltering}/${maxResults} needed)`);
+        }
+      } catch (filterError) {
+        console.error("Failed to analyze videos with custom filter:", filterError);
+        // If filtering fails, use the videos we already have (graceful degradation)
       }
-    } catch (filterError) {
-      console.error("Failed to analyze videos with custom filter:", filterError);
-      // If filtering fails, use the videos we already have (graceful degradation)
+    }
+
+    // Add filtered videos to our collection
+    allFetchedVideos.push(...filteredPageVideos);
+    
+    // Check if we have enough results now
+    if (allFetchedVideos.length >= maxResults) {
+      break;
+    }
+
+    // If no more pages available, stop
+    if (!nextPageToken) {
+      break;
     }
   }
 
   // Limit final results
-  videos = videos.slice(0, maxResults);
+  const videos = allFetchedVideos.slice(0, maxResults);
+  
+  if (videos.length === 0 && totalFetched > 0) {
+    console.log(`Searched through ${totalFetched} videos across ${pageCount} page(s) but found no authentic videos after filtering`);
+  } else if (videos.length > 0) {
+    console.log(`Found ${videos.length} authentic video(s) after searching through ${totalFetched} videos across ${pageCount} page(s)`);
+  }
 
   return { videos };
 }
