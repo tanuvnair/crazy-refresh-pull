@@ -6,6 +6,17 @@ const FEEDBACK_DIR = join(process.cwd(), "data");
 const POSITIVE_FEEDBACK_FILE = join(FEEDBACK_DIR, "positive-feedback.txt");
 const NEGATIVE_FEEDBACK_FILE = join(FEEDBACK_DIR, "negative-feedback.txt");
 
+export interface VideoMetadata {
+  id: string;
+  title?: string;
+  description?: string;
+  channelTitle?: string;
+  publishedAt?: string;
+  viewCount?: string;
+  likeCount?: string;
+  url?: string;
+}
+
 /**
  * Ensure the feedback directory exists
  */
@@ -16,32 +27,52 @@ async function ensureFeedbackDir(): Promise<void> {
 }
 
 /**
- * Read video IDs from a feedback file
+ * Read video metadata from a feedback file
+ * Supports both old format (just IDs) and new format (JSON objects)
  */
-async function readFeedbackFile(filePath: string): Promise<Set<string>> {
+async function readFeedbackFile(filePath: string): Promise<Map<string, VideoMetadata>> {
   try {
     if (!existsSync(filePath)) {
-      return new Set<string>();
+      return new Map<string, VideoMetadata>();
     }
     const content = await readFile(filePath, "utf-8");
-    const videoIds = content
+    const feedbackMap = new Map<string, VideoMetadata>();
+    
+    const lines = content
       .split("\n")
       .map((line) => line.trim())
       .filter((line) => line.length > 0);
-    return new Set(videoIds);
+    
+    for (const line of lines) {
+      try {
+        // Try to parse as JSON (new format)
+        const metadata: VideoMetadata = JSON.parse(line);
+        if (metadata.id) {
+          feedbackMap.set(metadata.id, metadata);
+        }
+      } catch {
+        // Fall back to old format (just ID)
+        if (line.length > 0) {
+          feedbackMap.set(line, { id: line });
+        }
+      }
+    }
+    
+    return feedbackMap;
   } catch (error) {
     console.error(`Failed to read feedback file ${filePath}:`, error);
-    return new Set<string>();
+    return new Map<string, VideoMetadata>();
   }
 }
 
 /**
- * Write video IDs to a feedback file
+ * Write video metadata to a feedback file
  */
-async function writeFeedbackFile(filePath: string, videoIds: Set<string>): Promise<void> {
+async function writeFeedbackFile(filePath: string, feedbackMap: Map<string, VideoMetadata>): Promise<void> {
   try {
     await ensureFeedbackDir();
-    const content = Array.from(videoIds).join("\n");
+    const lines = Array.from(feedbackMap.values()).map((metadata) => JSON.stringify(metadata));
+    const content = lines.join("\n");
     await writeFile(filePath, content, "utf-8");
   } catch (error) {
     console.error(`Failed to write feedback file ${filePath}:`, error);
@@ -50,43 +81,51 @@ async function writeFeedbackFile(filePath: string, videoIds: Set<string>): Promi
 }
 
 /**
- * Add a video ID to positive feedback
+ * Add a video with metadata to positive feedback
  */
-export async function addPositiveFeedback(videoId: string): Promise<void> {
+export async function addPositiveFeedback(videoId: string, metadata?: Partial<VideoMetadata>): Promise<void> {
   if (!videoId || videoId.trim().length === 0) {
     throw new Error("Video ID is required");
   }
 
-  const positiveIds = await readFeedbackFile(POSITIVE_FEEDBACK_FILE);
-  const negativeIds = await readFeedbackFile(NEGATIVE_FEEDBACK_FILE);
+  const positiveFeedback = await readFeedbackFile(POSITIVE_FEEDBACK_FILE);
+  const negativeFeedback = await readFeedbackFile(NEGATIVE_FEEDBACK_FILE);
 
   // Remove from negative if it exists there
-  negativeIds.delete(videoId);
-  await writeFeedbackFile(NEGATIVE_FEEDBACK_FILE, negativeIds);
+  negativeFeedback.delete(videoId);
+  await writeFeedbackFile(NEGATIVE_FEEDBACK_FILE, negativeFeedback);
 
-  // Add to positive
-  positiveIds.add(videoId.trim());
-  await writeFeedbackFile(POSITIVE_FEEDBACK_FILE, positiveIds);
+  // Add to positive with metadata
+  const videoMetadata: VideoMetadata = {
+    id: videoId.trim(),
+    ...metadata,
+  };
+  positiveFeedback.set(videoId.trim(), videoMetadata);
+  await writeFeedbackFile(POSITIVE_FEEDBACK_FILE, positiveFeedback);
 }
 
 /**
- * Add a video ID to negative feedback
+ * Add a video with metadata to negative feedback
  */
-export async function addNegativeFeedback(videoId: string): Promise<void> {
+export async function addNegativeFeedback(videoId: string, metadata?: Partial<VideoMetadata>): Promise<void> {
   if (!videoId || videoId.trim().length === 0) {
     throw new Error("Video ID is required");
   }
 
-  const positiveIds = await readFeedbackFile(POSITIVE_FEEDBACK_FILE);
-  const negativeIds = await readFeedbackFile(NEGATIVE_FEEDBACK_FILE);
+  const positiveFeedback = await readFeedbackFile(POSITIVE_FEEDBACK_FILE);
+  const negativeFeedback = await readFeedbackFile(NEGATIVE_FEEDBACK_FILE);
 
   // Remove from positive if it exists there
-  positiveIds.delete(videoId);
-  await writeFeedbackFile(POSITIVE_FEEDBACK_FILE, positiveIds);
+  positiveFeedback.delete(videoId);
+  await writeFeedbackFile(POSITIVE_FEEDBACK_FILE, positiveFeedback);
 
-  // Add to negative
-  negativeIds.add(videoId.trim());
-  await writeFeedbackFile(NEGATIVE_FEEDBACK_FILE, negativeIds);
+  // Add to negative with metadata
+  const videoMetadata: VideoMetadata = {
+    id: videoId.trim(),
+    ...metadata,
+  };
+  negativeFeedback.set(videoId.trim(), videoMetadata);
+  await writeFeedbackFile(NEGATIVE_FEEDBACK_FILE, negativeFeedback);
 }
 
 /**
@@ -97,27 +136,43 @@ export async function removeFeedback(videoId: string): Promise<void> {
     throw new Error("Video ID is required");
   }
 
-  const positiveIds = await readFeedbackFile(POSITIVE_FEEDBACK_FILE);
-  const negativeIds = await readFeedbackFile(NEGATIVE_FEEDBACK_FILE);
+  const positiveFeedback = await readFeedbackFile(POSITIVE_FEEDBACK_FILE);
+  const negativeFeedback = await readFeedbackFile(NEGATIVE_FEEDBACK_FILE);
 
-  positiveIds.delete(videoId.trim());
-  negativeIds.delete(videoId.trim());
+  positiveFeedback.delete(videoId.trim());
+  negativeFeedback.delete(videoId.trim());
 
-  await writeFeedbackFile(POSITIVE_FEEDBACK_FILE, positiveIds);
-  await writeFeedbackFile(NEGATIVE_FEEDBACK_FILE, negativeIds);
+  await writeFeedbackFile(POSITIVE_FEEDBACK_FILE, positiveFeedback);
+  await writeFeedbackFile(NEGATIVE_FEEDBACK_FILE, negativeFeedback);
 }
 
 /**
- * Get all positive feedback video IDs
+ * Get all positive feedback video IDs (for backward compatibility)
  */
 export async function getPositiveFeedback(): Promise<Set<string>> {
+  const feedback = await readFeedbackFile(POSITIVE_FEEDBACK_FILE);
+  return new Set(feedback.keys());
+}
+
+/**
+ * Get all negative feedback video IDs (for backward compatibility)
+ */
+export async function getNegativeFeedback(): Promise<Set<string>> {
+  const feedback = await readFeedbackFile(NEGATIVE_FEEDBACK_FILE);
+  return new Set(feedback.keys());
+}
+
+/**
+ * Get all positive feedback with metadata
+ */
+export async function getPositiveFeedbackWithMetadata(): Promise<Map<string, VideoMetadata>> {
   return readFeedbackFile(POSITIVE_FEEDBACK_FILE);
 }
 
 /**
- * Get all negative feedback video IDs
+ * Get all negative feedback with metadata
  */
-export async function getNegativeFeedback(): Promise<Set<string>> {
+export async function getNegativeFeedbackWithMetadata(): Promise<Map<string, VideoMetadata>> {
   return readFeedbackFile(NEGATIVE_FEEDBACK_FILE);
 }
 
@@ -129,15 +184,19 @@ export async function getFeedbackSummary(): Promise<{
   negativeCount: number;
   positiveExamples: string[];
   negativeExamples: string[];
+  positiveMetadata: VideoMetadata[];
+  negativeMetadata: VideoMetadata[];
 }> {
-  const positiveIds = await getPositiveFeedback();
-  const negativeIds = await getNegativeFeedback();
+  const positiveFeedback = await getPositiveFeedbackWithMetadata();
+  const negativeFeedback = await getNegativeFeedbackWithMetadata();
 
   return {
-    positiveCount: positiveIds.size,
-    negativeCount: negativeIds.size,
-    positiveExamples: Array.from(positiveIds).slice(0, 10),
-    negativeExamples: Array.from(negativeIds).slice(0, 10),
+    positiveCount: positiveFeedback.size,
+    negativeCount: negativeFeedback.size,
+    positiveExamples: Array.from(positiveFeedback.keys()).slice(0, 10),
+    negativeExamples: Array.from(negativeFeedback.keys()).slice(0, 10),
+    positiveMetadata: Array.from(positiveFeedback.values()),
+    negativeMetadata: Array.from(negativeFeedback.values()),
   };
 }
 

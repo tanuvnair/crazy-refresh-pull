@@ -6,6 +6,7 @@ import {
   getVideoFeedbackStatus,
   getBatchVideoFeedbackStatus,
 } from "~/services/feedback.server";
+import type { VideoMetadata } from "~/services/feedback.server";
 
 export async function POST(event: APIEvent) {
   try {
@@ -23,7 +24,7 @@ export async function POST(event: APIEvent) {
     }
 
     const body = await event.request.json();
-    const { action, videoId } = body;
+    const { action, videoId, metadata } = body;
 
     if (!action || !videoId) {
       return new Response(
@@ -37,12 +38,26 @@ export async function POST(event: APIEvent) {
       );
     }
 
+    // Prepare metadata if provided
+    const videoMetadata: Partial<VideoMetadata> | undefined = metadata
+      ? {
+          id: videoId,
+          title: metadata.title,
+          description: metadata.description,
+          channelTitle: metadata.channelTitle,
+          publishedAt: metadata.publishedAt,
+          viewCount: metadata.viewCount,
+          likeCount: metadata.likeCount,
+          url: metadata.url,
+        }
+      : undefined;
+
     switch (action) {
       case "like":
-        await addPositiveFeedback(videoId);
+        await addPositiveFeedback(videoId, videoMetadata);
         break;
       case "dislike":
-        await addNegativeFeedback(videoId);
+        await addNegativeFeedback(videoId, videoMetadata);
         break;
       case "remove":
         await removeFeedback(videoId);

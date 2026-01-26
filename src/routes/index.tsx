@@ -3,21 +3,18 @@ import { createSignal, onMount } from "solid-js";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Label, Checkbox } from "~/components/ui";
 import { Button } from "~/components/ui";
 import { Input } from "~/components/ui";
-import { Search, Loader2, Key, Eye, EyeOff, X, Loader, Sparkles } from "lucide-solid";
+import { Search, Loader2, Key, Eye, EyeOff, X, Loader, Brain, Save } from "lucide-solid";
 import VideoCard, { type Video } from "~/components/video-card";
 import { encryptApiKey, decryptApiKey } from "~/lib/encryption";
-import { getYouTubeApiKeyFromCookie, saveYouTubeApiKeyToCookie, getGeminiApiKeyFromCookie, saveGeminiApiKeyToCookie } from "~/lib/cookie";
+import { getYouTubeApiKeyFromCookie, saveYouTubeApiKeyToCookie } from "~/lib/cookie";
 
 const YOUTUBE_API_KEY_STORAGE_KEY = "youtube_api_key_encrypted";
-const GEMINI_API_KEY_STORAGE_KEY = "gemini_api_key_encrypted";
-const USE_GEMINI_FILTERING_KEY = "use_gemini_filtering";
+const USE_CUSTOM_FILTERING_KEY = "use_custom_filtering";
 
 export default function Home() {
   const [youtubeApiKey, setYoutubeApiKey] = createSignal("");
-  const [geminiApiKey, setGeminiApiKey] = createSignal("");
   const [showYoutubeApiKey, setShowYoutubeApiKey] = createSignal(false);
-  const [showGeminiApiKey, setShowGeminiApiKey] = createSignal(false);
-  const [useGeminiFiltering, setUseGeminiFiltering] = createSignal(false);
+  const [useCustomFiltering, setUseCustomFiltering] = createSignal(true);
   const [searchQuery, setSearchQuery] = createSignal("");
   const [videos, setVideos] = createSignal<Video[]>([]);
   const [loading, setLoading] = createSignal(false);
@@ -43,33 +40,26 @@ export default function Home() {
         }
       }
 
-      // Load Gemini API key
-      let geminiEncrypted = getGeminiApiKeyFromCookie();
-      if (!geminiEncrypted) {
-        geminiEncrypted = sessionStorage.getItem(GEMINI_API_KEY_STORAGE_KEY);
-      }
-      if (geminiEncrypted) {
-        const decrypted = decryptApiKey(geminiEncrypted);
-        if (decrypted) {
-          setGeminiApiKey(decrypted);
-        }
-      }
-
-      // Load Gemini filtering preference
-      const useGemini = sessionStorage.getItem(USE_GEMINI_FILTERING_KEY);
-      if (useGemini === "true") {
-        setUseGeminiFiltering(true);
+      // Load custom filtering preference
+      const useCustom = sessionStorage.getItem(USE_CUSTOM_FILTERING_KEY);
+      if (useCustom !== null) {
+        setUseCustomFiltering(useCustom === "true");
       }
     } catch (err) {
       console.error("Failed to load API keys from storage:", err);
     }
   });
 
-  // Save YouTube API key to both cookie and sessionStorage when it changes (encrypted)
+  // Update YouTube API key state (without saving)
   const handleYoutubeApiKeyChange = (value: string) => {
     setYoutubeApiKey(value);
+  };
+
+  // Save YouTube API key to both cookie and sessionStorage (encrypted)
+  const handleSaveYoutubeApiKey = () => {
+    const value = youtubeApiKey().trim();
     try {
-      if (value.trim()) {
+      if (value) {
         const encrypted = encryptApiKey(value);
         sessionStorage.setItem(YOUTUBE_API_KEY_STORAGE_KEY, encrypted);
         saveYouTubeApiKeyToCookie(encrypted);
@@ -82,27 +72,10 @@ export default function Home() {
     }
   };
 
-  // Save Gemini API key to both cookie and sessionStorage when it changes (encrypted)
-  const handleGeminiApiKeyChange = (value: string) => {
-    setGeminiApiKey(value);
-    try {
-      if (value.trim()) {
-        const encrypted = encryptApiKey(value);
-        sessionStorage.setItem(GEMINI_API_KEY_STORAGE_KEY, encrypted);
-        saveGeminiApiKeyToCookie(encrypted);
-      } else {
-        sessionStorage.removeItem(GEMINI_API_KEY_STORAGE_KEY);
-        saveGeminiApiKeyToCookie("");
-      }
-    } catch (err) {
-      console.error("Failed to save Gemini API key to storage:", err);
-    }
-  };
-
-  // Toggle Gemini filtering
-  const handleGeminiFilteringToggle = (enabled: boolean) => {
-    setUseGeminiFiltering(enabled);
-    sessionStorage.setItem(USE_GEMINI_FILTERING_KEY, enabled.toString());
+  // Toggle custom filtering
+  const handleCustomFilteringToggle = (enabled: boolean) => {
+    setUseCustomFiltering(enabled);
+    sessionStorage.setItem(USE_CUSTOM_FILTERING_KEY, enabled.toString());
   };
 
   // Clear YouTube API key
@@ -116,30 +89,14 @@ export default function Home() {
     }
   };
 
-  // Clear Gemini API key
-  const handleClearGeminiApiKey = () => {
-    setGeminiApiKey("");
-    try {
-      sessionStorage.removeItem(GEMINI_API_KEY_STORAGE_KEY);
-      saveGeminiApiKeyToCookie("");
-    } catch (err) {
-      console.error("Failed to clear Gemini API key:", err);
-    }
-  };
 
   const handleSearch = async () => {
     const query = searchQuery().trim();
     const youtubeKey = youtubeApiKey().trim();
-    const geminiKey = geminiApiKey().trim();
-    const useGemini = useGeminiFiltering();
+    const useCustom = useCustomFiltering();
 
     if (!youtubeKey) {
       setError("Please enter your YouTube API key");
-      return;
-    }
-
-    if (useGemini && !geminiKey) {
-      setError("Please enter your Gemini API key to use AI filtering");
       return;
     }
 
@@ -159,13 +116,14 @@ export default function Home() {
         apiKey: youtubeKey,
       });
 
-      if (useGemini && geminiKey) {
-        params.set("geminiApiKey", geminiKey);
-        params.set("useGeminiFiltering", "true");
+      if (useCustom) {
+        params.set("useCustomFiltering", "true");
+      } else {
+        params.set("useCustomFiltering", "false");
       }
 
       const response = await fetch(`/api/youtube?${params.toString()}`);
-      
+
       if (!response.ok) {
         let errorMessage = "Failed to fetch videos";
         try {
@@ -277,6 +235,17 @@ export default function Home() {
                       )}
                     </div>
                   </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="default"
+                    onClick={handleSaveYoutubeApiKey}
+                    disabled={loading() || !youtubeApiKey().trim()}
+                    class="flex items-center gap-2"
+                  >
+                    <Save size={16} />
+                    <span>Save</span>
+                  </Button>
                 </div>
 
                 <p class="text-xs text-muted-foreground">
@@ -296,86 +265,26 @@ export default function Home() {
               </div>
 
               <div class="flex flex-col gap-4">
-                <Label
-                  for="gemini-api-key"
-                >
-                  <Sparkles class="h-4 w-4 text-primary" />
-                  Gemini API Key
-                </Label>
-
-                <div class="flex flex-row gap-2">
-                  <div class="relative flex-1">
-                    <Input
-                      id="gemini-api-key"
-                      type={showGeminiApiKey() ? "text" : "password"}
-                      placeholder="Enter your Google Gemini API key"
-                      class="w-full pr-20"
-                      value={geminiApiKey()}
-                      onInput={(e) => handleGeminiApiKeyChange(e.currentTarget.value)}
-                      disabled={loading()}
-                    />
-                    <div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setShowGeminiApiKey(!showGeminiApiKey())}
-                        title={showGeminiApiKey() ? "Hide API key" : "Show API key"}
-                        disabled={loading()}
-                      >
-                        {showGeminiApiKey() ? (
-                          <EyeOff class="text-muted-foreground hover:text-foreground" />
-                        ) : (
-                          <Eye class="text-muted-foreground hover:text-foreground" />
-                        )}
-                      </Button>
-
-                      {geminiApiKey() && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={handleClearGeminiApiKey}
-                          title="Clear API key"
-                          disabled={loading()}
-                        >
-                          <X class="text-muted-foreground hover:text-foreground" />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
                 <div class="flex items-center gap-2">
                   <Checkbox
-                    id="use-gemini-filtering"
-                    checked={useGeminiFiltering()}
-                    onChange={(e) => handleGeminiFilteringToggle(e.currentTarget.checked)}
-                    disabled={loading() || !geminiApiKey().trim()}
+                    id="use-custom-filtering"
+                    checked={useCustomFiltering()}
+                    onChange={(e) => handleCustomFilteringToggle(e.currentTarget.checked)}
+                    disabled={loading()}
                   />
 
                   <Label
-                    for="use-gemini-filtering"
+                    for="use-custom-filtering"
                     class="text-sm font-normal cursor-pointer"
                     selectable={false}
                   >
-                    Use AI-powered content filtering (requires Gemini API key)
+                    <Brain class="h-4 w-4 text-primary inline" />
+                    Use AI-powered content filtering
                   </Label>
                 </div>
 
                 <p class="text-xs text-muted-foreground">
-                  Get your Gemini API key from{" "}
-                  <a
-                    href="https://aistudio.google.com/app/apikey"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="text-primary hover:underline"
-                  >
-                    Google AI Studio
-                  </a>
-                  <span class="text-xs text-muted-foreground">
-                    .{" "}Gemini analyzes video content to identify authentic vs. manufactured content.
-                  </span>
+                  Our custom AI filter analyzes video titles, descriptions, and engagement metrics to identify authentic, high-quality content versus "slop" or manufactured content. The filter learns from your feedback to improve over time.
                 </p>
               </div>
 

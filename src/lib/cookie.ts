@@ -1,5 +1,4 @@
 const YOUTUBE_COOKIE_NAME = "youtube_api_key_encrypted";
-const GEMINI_COOKIE_NAME = "gemini_api_key_encrypted";
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
 
 /**
@@ -54,20 +53,3 @@ export function saveYouTubeApiKeyToCookie(encrypted: string): void {
   }
 }
 
-/**
- * Get the encrypted Gemini API key from cookie
- */
-export function getGeminiApiKeyFromCookie(): string | null {
-  return getCookie(GEMINI_COOKIE_NAME);
-}
-
-/**
- * Save the encrypted Gemini API key to cookie
- */
-export function saveGeminiApiKeyToCookie(encrypted: string): void {
-  if (encrypted) {
-    setCookie(GEMINI_COOKIE_NAME, encrypted);
-  } else {
-    deleteCookie(GEMINI_COOKIE_NAME);
-  }
-}

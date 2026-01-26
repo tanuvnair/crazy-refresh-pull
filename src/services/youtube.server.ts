@@ -157,7 +157,7 @@ export async function searchYouTubeVideos(
       const channelTitle = item.snippet.channelTitle;
 
       // Filter out Shorts (videos shorter than 60 seconds)
-      // Content quality filtering is handled by Gemini AI if enabled
+      // Content quality filtering is handled by custom AI filter if enabled
       if (duration === undefined || duration < 60) {
         continue;
       }
@@ -194,9 +194,7 @@ export interface SearchVideosOptions {
   query: string;
   youtubeApiKey: string;
   maxResults?: number;
-  geminiApiKey?: string;
-  useGeminiFiltering?: boolean;
-  customGeminiPrompt?: string;
+  useCustomFiltering?: boolean;
 }
 
 export interface SearchVideosResult {
@@ -213,15 +211,13 @@ export async function handleYouTubeSearchRequest(request: Request): Promise<Resp
     const query = url.searchParams.get("q") || "";
     const maxResults = parseInt(url.searchParams.get("maxResults") || "10", 10);
     const apiKey = url.searchParams.get("apiKey") || process.env.YOUTUBE_API_KEY || "";
-    const geminiApiKey = url.searchParams.get("geminiApiKey") || undefined;
-    const useGeminiFiltering = url.searchParams.get("useGeminiFiltering") === "true";
+    const useCustomFiltering = url.searchParams.get("useCustomFiltering") !== "false"; // Default to true
 
     const result = await searchVideosWithFiltering({
       query,
       youtubeApiKey: apiKey,
       maxResults,
-      geminiApiKey,
-      useGeminiFiltering,
+      useCustomFiltering,
     });
 
     return new Response(JSON.stringify(result), {
@@ -246,13 +242,13 @@ export async function handleYouTubeSearchRequest(request: Request): Promise<Resp
 }
 
 /**
- * Search YouTube videos with optional Gemini AI filtering
+ * Search YouTube videos with optional custom AI filtering
  * This is the main business logic function that orchestrates the entire search flow
  */
 export async function searchVideosWithFiltering(
   options: SearchVideosOptions
 ): Promise<SearchVideosResult> {
-  const { query, youtubeApiKey, maxResults = 50, geminiApiKey, useGeminiFiltering, customGeminiPrompt } = options;
+  const { query, youtubeApiKey, maxResults = 50, useCustomFiltering = true } = options;
 
   // Validate inputs
   if (!query || query.trim().length === 0) {
@@ -261,10 +257,6 @@ export async function searchVideosWithFiltering(
 
   if (!youtubeApiKey || youtubeApiKey.trim().length === 0) {
     throw new Error("YouTube API key is required");
-  }
-
-  if (useGeminiFiltering && (!geminiApiKey || geminiApiKey.trim().length === 0)) {
-    throw new Error("Gemini API key is required when Gemini filtering is enabled");
   }
 
   // Search and filter videos using YouTube service
@@ -290,24 +282,24 @@ export async function searchVideosWithFiltering(
     // Continue without repeat filtering if it fails
   }
 
-  // Apply Gemini AI filtering if enabled
-  if (useGeminiFiltering && geminiApiKey && videos.length > 0) {
+  // Apply custom AI filtering if enabled
+  if (useCustomFiltering && videos.length > 0) {
     try {
       const videosBeforeFiltering = videos.length;
-      const { analyzeVideosWithGemini, filterVideosByAnalysis } = await import("./gemini.server");
-      const analysisResults = await analyzeVideosWithGemini(videos, geminiApiKey, customGeminiPrompt);
+      const { analyzeVideos, filterVideosByAnalysis } = await import("./filter.server");
+      const analysisResults = await analyzeVideos(videos);
       videos = filterVideosByAnalysis(videos, analysisResults);
       const videosAfterFiltering = videos.length;
       const filteredCount = videosBeforeFiltering - videosAfterFiltering;
       
       if (filteredCount > 0) {
-        console.log(`AI filtering applied: ${filteredCount} video(s) filtered out (${videosBeforeFiltering} → ${videosAfterFiltering})`);
+        console.log(`Custom AI filtering applied: ${filteredCount} video(s) filtered out (${videosBeforeFiltering} → ${videosAfterFiltering})`);
       } else {
-        console.log(`AI filtering applied: All ${videosBeforeFiltering} video(s) passed the authenticity check`);
+        console.log(`Custom AI filtering applied: All ${videosBeforeFiltering} video(s) passed the authenticity check`);
       }
-    } catch (geminiError) {
-      console.error("Failed to analyze videos with Gemini:", geminiError);
-      // If Gemini fails, use the videos we already have (graceful degradation)
+    } catch (filterError) {
+      console.error("Failed to analyze videos with custom filter:", filterError);
+      // If filtering fails, use the videos we already have (graceful degradation)
     }
   }
 

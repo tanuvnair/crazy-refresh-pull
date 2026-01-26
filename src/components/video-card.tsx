@@ -1,6 +1,7 @@
-import { Component, JSX } from "solid-js";
+import { Component, JSX, createSignal, onMount } from "solid-js";
 import { Card, CardContent } from "~/components/ui";
-import { ExternalLink } from "lucide-solid";
+import { Button } from "~/components/ui";
+import { ExternalLink, ThumbsUp, ThumbsDown } from "lucide-solid";
 
 export interface Video {
   id: string;
@@ -19,6 +20,65 @@ export interface VideoCardProps {
 }
 
 const VideoCard: Component<VideoCardProps> = (props) => {
+  const [feedbackStatus, setFeedbackStatus] = createSignal<"positive" | "negative" | null>(null);
+  const [isSubmitting, setIsSubmitting] = createSignal(false);
+
+  // Load feedback status on mount
+  onMount(async () => {
+    try {
+      const response = await fetch(`/api/feedback?videoId=${props.video.id}`);
+      if (response.ok) {
+        const data = await response.json();
+        setFeedbackStatus(data.status);
+      }
+    } catch (error) {
+      console.error("Failed to load feedback status:", error);
+    }
+  });
+
+  const handleFeedback = async (action: "like" | "dislike") => {
+    if (isSubmitting()) return;
+
+    // If clicking the same button, remove feedback
+    const newAction = feedbackStatus() === (action === "like" ? "positive" : "negative") 
+      ? "remove" 
+      : action;
+
+    setIsSubmitting(true);
+    try {
+      const response = await fetch("/api/feedback", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: newAction === "remove" ? "remove" : newAction === "like" ? "like" : "dislike",
+          videoId: props.video.id,
+          metadata: {
+            title: props.video.title,
+            description: props.video.description,
+            channelTitle: props.video.channelTitle,
+            publishedAt: props.video.publishedAt,
+            viewCount: props.video.viewCount,
+            likeCount: props.video.likeCount,
+            url: props.video.url,
+          },
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setFeedbackStatus(data.status);
+      } else {
+        console.error("Failed to update feedback");
+      }
+    } catch (error) {
+      console.error("Error updating feedback:", error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const formatNumber = (num?: string): string => {
     if (!num) return "N/A";
     const number = parseInt(num, 10);
@@ -87,6 +147,39 @@ const VideoCard: Component<VideoCardProps> = (props) => {
           </div>
         </CardContent>
       </a>
+      
+      <div class="px-4 pb-4 flex items-center gap-2">
+        <Button
+          type="button"
+          variant={feedbackStatus() === "positive" ? "default" : "outline"}
+          size="sm"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            handleFeedback("like");
+          }}
+          disabled={isSubmitting()}
+          class="flex-1"
+        >
+          <ThumbsUp size={16} class={feedbackStatus() === "positive" ? "fill-current" : ""} />
+          <span class="ml-1">Like</span>
+        </Button>
+        <Button
+          type="button"
+          variant={feedbackStatus() === "negative" ? "destructive" : "outline"}
+          size="sm"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            handleFeedback("dislike");
+          }}
+          disabled={isSubmitting()}
+          class="flex-1"
+        >
+          <ThumbsDown size={16} class={feedbackStatus() === "negative" ? "fill-current" : ""} />
+          <span class="ml-1">Dislike</span>
+        </Button>
+      </div>
     </Card>
   );
 };
