@@ -1,22 +1,6 @@
 import type { Video } from "~/components/video-card";
+import { decodeHtmlEntities } from "~/lib/html-entities";
 import { applyFiltersAndRank } from "./apply-filters-rank.server";
-
-/** Decodes common HTML entities returned by the YouTube Data API. */
-function decodeHtmlEntities(text: string): string {
-  const entities: Record<string, string> = {
-    "&amp;": "&",
-    "&lt;": "<",
-    "&gt;": ">",
-    "&quot;": '"',
-    "&#39;": "'",
-    "&#x27;": "'",
-    "&apos;": "'",
-  };
-  return text.replace(
-    /&(?:amp|lt|gt|quot|apos|#39|#x27);/g,
-    (match) => entities[match] ?? match,
-  );
-}
 
 interface YouTubeSearchResponse {
   items: Array<{

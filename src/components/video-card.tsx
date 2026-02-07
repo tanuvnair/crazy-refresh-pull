@@ -1,6 +1,7 @@
 import { Component, JSX, createSignal, onMount } from "solid-js";
 import { Badge, Button, Card, CardContent } from "~/components/ui";
 import { ExternalLink, ThumbsUp, ThumbsDown } from "lucide-solid";
+import { decodeHtmlEntities } from "~/lib/html-entities";
 
 export interface Video {
   id: string;
@@ -117,7 +118,7 @@ const VideoCard: Component<VideoCardProps> = (props) => {
         <div class="relative w-full aspect-video bg-muted overflow-hidden">
           <img
             src={props.video.thumbnail}
-            alt={props.video.title}
+            alt={decodeHtmlEntities(props.video.title)}
             class="w-full h-full object-cover"
             loading="lazy"
           />
@@ -129,11 +130,11 @@ const VideoCard: Component<VideoCardProps> = (props) => {
 
         <CardContent class="p-4">
           <h3 class="text-lg font-semibold leading-7 line-clamp-2 min-h-14">
-            {props.video.title}
+            {decodeHtmlEntities(props.video.title)}
           </h3>
           <div class="flex flex-col gap-2 mt-2">
             <div class="flex items-center justify-between text-xs text-muted-foreground">
-              <span>{props.video.channelTitle}</span>
+              <span>{decodeHtmlEntities(props.video.channelTitle)}</span>
               <span>{formatDate(props.video.publishedAt)}</span>
             </div>
             <div class="flex items-center gap-4 text-xs text-muted-foreground">
