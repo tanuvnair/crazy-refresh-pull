@@ -1,8 +1,9 @@
 import { Title } from "@solidjs/meta";
 import { createSignal, onMount } from "solid-js";
-import { Alert, Button, Checkbox, Dialog, DialogContent, DialogHeader, DialogBody, DialogFooter, DialogTitle, DialogDescription, EmptyState, Input, SettingsSection, SettingsGroup, SettingsRow, SettingsContentRow, Text } from "~/components/ui";
-import { Search, Eye, EyeOff, Loader, Plus, Settings, Sparkles, Database, RefreshCw, ArrowLeft } from "lucide-solid";
+import { Alert, Button, EmptyState, Input, Text } from "~/components/ui";
+import { Search, Settings, RefreshCw, ArrowLeft, Loader } from "lucide-solid";
 import VideoCard, { type Video } from "~/components/video-card";
+import SettingsDialog from "~/components/settings-dialog";
 import { encryptApiKey, decryptApiKey } from "~/lib/encryption";
 import { getYouTubeApiKeyFromCookie, saveYouTubeApiKeyToCookie } from "~/lib/cookie";
 
@@ -559,171 +560,35 @@ export default function Home() {
             />
           )}
 
-          <Dialog open={showSettings()} onOpenChange={setShowSettings}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Settings</DialogTitle>
-                <DialogDescription>
-                  Configure your API key, content filters, and recommendations.
-                </DialogDescription>
-              </DialogHeader>
-
-              <DialogBody>
-                {/* -- Section: YouTube API Key -- */}
-                <SettingsSection class="pt-0 pb-1">YouTube API Key</SettingsSection>
-                <SettingsGroup>
-                  <SettingsRow label="API Key">
-                    <div class="flex items-center gap-2 min-w-0">
-                      <Input
-                        id="youtube-api-key"
-                        type={showYoutubeApiKey() ? "text" : "password"}
-                        placeholder="Paste key here..."
-                        class="h-8 text-sm text-right bg-transparent border-0 shadow-none focus:ring-0 min-w-0"
-                        value={youtubeApiKey()}
-                        onInput={(e) => handleYoutubeApiKeyChange(e.currentTarget.value)}
-                        disabled={searchLoading()}
-                      />
-                      <Button type="button" variant="ghost" size="icon" class="h-7 w-7 shrink-0" onClick={() => setShowYoutubeApiKey(!showYoutubeApiKey())} title={showYoutubeApiKey() ? "Hide" : "Show"}>
-                        {showYoutubeApiKey() ? <EyeOff class="h-3.5 w-3.5 text-muted-foreground" /> : <Eye class="h-3.5 w-3.5 text-muted-foreground" />}
-                      </Button>
-                    </div>
-                  </SettingsRow>
-                  <div class="flex items-center justify-between px-4 py-2.5">
-                    <p class="text-xs text-muted-foreground">
-                      <a href="https://console.cloud.google.com/marketplace/product/google/youtube.googleapis.com" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">Enable the YouTube Data API</a>, then create a key in{" "}
-                      <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">Credentials</a>. Stored encrypted in your browser.
-                    </p>
-                    <div class="flex items-center gap-2 shrink-0 ml-3">
-                      {youtubeApiKey() && (
-                        <Button type="button" variant="ghost" size="xs" onClick={handleClearYoutubeApiKey} disabled={searchLoading()} class="text-destructive h-7">Clear</Button>
-                      )}
-                      <Button type="button" variant="default" size="xs" onClick={handleSaveYoutubeApiKey} disabled={searchLoading() || !youtubeApiKey().trim()} class="h-7">Save</Button>
-                    </div>
-                  </div>
-                </SettingsGroup>
-
-                {/* -- Section: Content Filtering -- */}
-                <SettingsSection class="pb-1">Content Filtering</SettingsSection>
-                <SettingsGroup>
-                  <SettingsRow label="AI-powered filtering" description="Analyzes titles and engagement for authentic content">
-                    <Checkbox
-                      id="use-custom-filtering"
-                      checked={useCustomFiltering()}
-                      onChange={(e) => handleCustomFilteringToggle(e.currentTarget.checked)}
-                      disabled={searchLoading()}
-                    />
-                  </SettingsRow>
-                  <SettingsRow label="Authenticity threshold">
-                    <div class="flex items-center gap-3 w-40">
-                      <Input
-                        id="authenticity-threshold"
-                        type="range"
-                        min="0"
-                        max="1"
-                        step="0.05"
-                        value={filterSettings().authenticityThreshold}
-                        onInput={(e) => {
-                          const value = parseFloat(e.currentTarget.value);
-                          handleFilterSettingsChange("authenticityThreshold", value);
-                          e.currentTarget.style.setProperty("--fill-percentage", `${value * 100}%`);
-                        }}
-                        disabled={searchLoading()}
-                        class="slider-with-fill flex-1"
-                        style={`--fill-percentage: ${filterSettings().authenticityThreshold * 100}%`}
-                      />
-                      <span class="text-xs tabular-nums text-muted-foreground w-8 text-right">{filterSettings().authenticityThreshold.toFixed(2)}</span>
-                    </div>
-                  </SettingsRow>
-                  <SettingsRow label="Max pages to search" description="Used when searching YouTube">
-                    <Input id="max-pages" type="number" min="1" max="95" value={filterSettings().maxPagesToSearch} onInput={(e) => { const v = parseInt(e.currentTarget.value, 10) || 20; handleFilterSettingsChange("maxPagesToSearch", Math.max(1, Math.min(v, 95))); }} disabled={searchLoading()} class="h-8 w-20 text-sm text-right" />
-                  </SettingsRow>
-                  <SettingsRow label="Max videos to fetch" description="Used when searching YouTube">
-                    <Input id="max-total-videos" type="number" min="50" max="4750" step="50" value={filterSettings().maxTotalVideosToFetch} onInput={(e) => { const v = parseInt(e.currentTarget.value, 10) || 1000; handleFilterSettingsChange("maxTotalVideosToFetch", Math.max(50, Math.min(v, 4750))); }} disabled={searchLoading()} class="h-8 w-20 text-sm text-right" />
-                  </SettingsRow>
-                  <SettingsRow label="Min duration (seconds)" description="Filters out Shorts" border={false}>
-                    <Input id="min-duration" type="number" min="0" max="600" step="10" value={filterSettings().minVideoDurationSeconds} onInput={(e) => { const v = parseInt(e.currentTarget.value, 10) || 60; handleFilterSettingsChange("minVideoDurationSeconds", Math.max(0, Math.min(v, 600))); }} disabled={searchLoading()} class="h-8 w-20 text-sm text-right" />
-                  </SettingsRow>
-                </SettingsGroup>
-
-                {/* -- Section: Training Data -- */}
-                <SettingsSection class="pb-1">Training Data</SettingsSection>
-                <SettingsGroup>
-                  <SettingsContentRow label="Add favorite video" description="Requires API key. Trains your recommendation model.">
-                    <div class="flex items-center gap-2">
-                      <Input
-                        id="favorite-video-url"
-                        type="text"
-                        placeholder="https://youtube.com/watch?v=..."
-                        class="h-8 text-sm flex-1"
-                        value={favoriteVideoUrl()}
-                        onInput={(e) => setFavoriteVideoUrl(e.currentTarget.value)}
-                        disabled={addingFavorite() || searchLoading()}
-                        onKeyPress={(e) => { if (e.key === "Enter") handleAddFavoriteVideo(); }}
-                      />
-                      <Button type="button" size="xs" onClick={handleAddFavoriteVideo} disabled={addingFavorite() || searchLoading() || !favoriteVideoUrl().trim() || !youtubeApiKey().trim()} class="h-8 gap-1.5">
-                        {addingFavorite() ? <Loader class="animate-spin" size={14} /> : <Plus size={14} />}
-                        Add
-                      </Button>
-                    </div>
-                  </SettingsContentRow>
-                  <SettingsRow
-                    label="Recommendation model"
-                    description={modelStatus()
-                      ? modelStatus()!.available
-                        ? `Trained: ${modelStatus()!.positiveCount} likes, ${modelStatus()!.negativeCount} dislikes`
-                        : `${modelStatus()!.positiveCount} likes, ${modelStatus()!.negativeCount} dislikes (need 2 each)`
-                      : undefined}
-                    border={false}
-                  >
-                    <Button type="button" variant="outline" size="xs" onClick={handleTrainModel} disabled={trainingModel() || (modelStatus()?.positiveCount ?? 0) < 2 || (modelStatus()?.negativeCount ?? 0) < 2} class="h-8 gap-1.5 shrink-0">
-                      {trainingModel() ? <Loader class="animate-spin" size={14} /> : <Sparkles size={14} />}
-                      Train
-                    </Button>
-                  </SettingsRow>
-                </SettingsGroup>
-
-                {/* -- Section: Video Pool -- */}
-                <SettingsSection class="pb-1">Video Pool</SettingsSection>
-                <SettingsGroup>
-                  {poolStatus() && (
-                    <SettingsRow label="Pool size">
-                      <span class="text-sm text-muted-foreground tabular-nums">
-                        {poolStatus()!.count} video{poolStatus()!.count !== 1 ? "s" : ""}
-                        {poolStatus()!.updatedAt != null ? ` -- ${new Date(poolStatus()!.updatedAt!).toLocaleDateString()}` : ""}
-                      </span>
-                    </SettingsRow>
-                  )}
-                  <SettingsContentRow label="Search terms (comma-separated)">
-                    <Input
-                      id="pool-seed-queries"
-                      type="text"
-                      placeholder="documentary, cooking, travel"
-                      class="h-8 text-sm"
-                      value={poolSeedQueries()}
-                      onInput={(e) => setPoolSeedQueries(e.currentTarget.value)}
-                      disabled={seedingPool() || searchLoading()}
-                    />
-                  </SettingsContentRow>
-                  <SettingsRow label="Pages per term" border={false}>
-                    <div class="flex items-center gap-3">
-                      <Input id="pool-pages" type="number" min="1" max="5" value={poolPagesPerQuery()} onInput={(e) => setPoolPagesPerQuery(parseInt(e.currentTarget.value, 10) || 2)} disabled={seedingPool() || searchLoading()} class="h-8 w-16 text-sm text-right" />
-                      <Button type="button" variant="default" size="xs" onClick={handleSeedPool} disabled={seedingPool() || searchLoading() || !youtubeApiKey().trim()} class="h-8 gap-1.5 shrink-0">
-                        {seedingPool() ? <Loader class="animate-spin" size={14} /> : <Database size={14} />}
-                        Seed pool
-                      </Button>
-                    </div>
-                  </SettingsRow>
-                </SettingsGroup>
-
-              </DialogBody>
-
-              <DialogFooter>
-                <Button type="button" variant="default" size="default" onClick={() => setShowSettings(false)}>
-                  Done
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+          <SettingsDialog
+            open={showSettings()}
+            onOpenChange={setShowSettings}
+            youtubeApiKey={youtubeApiKey()}
+            onYoutubeApiKeyChange={handleYoutubeApiKeyChange}
+            showYoutubeApiKey={showYoutubeApiKey()}
+            onShowYoutubeApiKeyChange={setShowYoutubeApiKey}
+            onSaveYoutubeApiKey={handleSaveYoutubeApiKey}
+            onClearYoutubeApiKey={handleClearYoutubeApiKey}
+            searchLoading={searchLoading()}
+            useCustomFiltering={useCustomFiltering()}
+            onCustomFilteringToggle={handleCustomFilteringToggle}
+            filterSettings={filterSettings()}
+            onFilterSettingsChange={handleFilterSettingsChange}
+            favoriteVideoUrl={favoriteVideoUrl()}
+            onFavoriteVideoUrlChange={setFavoriteVideoUrl}
+            addingFavorite={addingFavorite()}
+            onAddFavoriteVideo={handleAddFavoriteVideo}
+            modelStatus={modelStatus()}
+            onTrainModel={handleTrainModel}
+            trainingModel={trainingModel()}
+            poolStatus={poolStatus()}
+            poolSeedQueries={poolSeedQueries()}
+            onPoolSeedQueriesChange={setPoolSeedQueries}
+            seedingPool={seedingPool()}
+            poolPagesPerQuery={poolPagesPerQuery()}
+            onPoolPagesPerQueryChange={setPoolPagesPerQuery}
+            onSeedPool={handleSeedPool}
+          />
         </div>
       </main >
     </>
