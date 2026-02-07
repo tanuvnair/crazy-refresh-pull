@@ -208,14 +208,14 @@ function sigmoid(x: number): number {
 
 let cachedModel: RecommendationModelData | null = null;
 
-function saveModel(data: RecommendationModelData): void {
-  modelRepo.setValue(MODEL_KEY, JSON.stringify(data));
+async function saveModel(data: RecommendationModelData): Promise<void> {
+  await modelRepo.setValue(MODEL_KEY, JSON.stringify(data));
   cachedModel = data;
 }
 
-function loadModelFromDb(): RecommendationModelData | null {
+async function loadModelFromDb(): Promise<RecommendationModelData | null> {
   if (cachedModel) return cachedModel;
-  const raw = modelRepo.getValue(MODEL_KEY);
+  const raw = await modelRepo.getValue(MODEL_KEY);
   if (!raw) return null;
   try {
     const data = JSON.parse(raw) as RecommendationModelData;
@@ -316,7 +316,7 @@ export async function trainModel(): Promise<{
     negativeCount: negativeList.length,
   };
 
-  saveModel(modelData);
+  await saveModel(modelData);
 
   return {
     success: true,
@@ -327,10 +327,10 @@ export async function trainModel(): Promise<{
 }
 
 /**
- * Load the recommendation model (cached in-memory, persisted in SQLite).
+ * Load the recommendation model (cached in-memory, persisted in Neon PostgreSQL).
  */
 export async function loadModel(): Promise<RecommendationModelData | null> {
-  return loadModelFromDb();
+  return await loadModelFromDb();
 }
 
 /**
@@ -345,7 +345,7 @@ export function invalidateModelCache(): void {
  * Returns null if no model is trained.
  */
 export async function scoreVideo(video: VideoLike): Promise<number | null> {
-  const model = loadModelFromDb();
+  const model = await loadModelFromDb();
   if (!model) return null;
   const patterns = await loadFeedbackPatterns();
   const features = await extractFeatures(video, patterns);
@@ -360,5 +360,5 @@ export async function scoreVideo(video: VideoLike): Promise<number | null> {
  * Check if the recommendation model is available (trained and loaded).
  */
 export async function isModelAvailable(): Promise<boolean> {
-  return loadModelFromDb() !== null;
+  return (await loadModelFromDb()) !== null;
 }

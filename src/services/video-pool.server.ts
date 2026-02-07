@@ -39,7 +39,7 @@ function videoToInsert(v: Video): { id: string; title: string; description?: str
  * Read the entire video pool. Prefer searchPool() for large pools.
  */
 export async function readPool(): Promise<VideoPoolData> {
-  const rows = videosRepo.findAll();
+  const rows = await videosRepo.findAll();
   const lastRow = rows[0];
   return {
     updatedAt: lastRow?.created_at ?? new Date(0).toISOString(),
@@ -52,26 +52,26 @@ export async function readPool(): Promise<VideoPoolData> {
  */
 export async function addToPool(newVideos: Video[]): Promise<{ added: number; total: number }> {
   const inserts = newVideos.filter((v) => v.id).map(videoToInsert);
-  const added = videosRepo.insertMany(inserts);
-  videosRepo.evictOldest();
-  const total = videosRepo.count();
+  const added = await videosRepo.insertMany(inserts);
+  await videosRepo.evictOldest();
+  const total = await videosRepo.count();
   return { added, total };
 }
 
 /**
  * Search pool by query. Returns up to limit results ranked by relevance.
- * The first parameter is accepted for backward compatibility but ignored; data comes from SQLite.
+ * The first parameter is accepted for backward compatibility but ignored; data comes from the database.
  */
-export function searchPool(_pool: VideoPoolData | null, query: string, limit: number): Video[] {
+export async function searchPool(_pool: VideoPoolData | null, query: string, limit: number): Promise<Video[]> {
   const q = query.trim().toLowerCase();
   const terms = q.split(/\s+/).filter((t) => t.length >= 2);
-  const rows = videosRepo.searchByTerms(terms, limit);
+  const rows = await videosRepo.searchByTerms(terms, limit);
 
   if (terms.length === 0) {
     return rows.map(rowToVideo);
   }
 
-  // Re-rank by how many terms matched (SQLite LIKE doesn't produce a score)
+  // Re-rank by how many terms matched (ILIKE doesn't produce a score)
   const scored = rows.map((row) => {
     const title = (row.title ?? "").toLowerCase();
     const desc = (row.description ?? "").toLowerCase();
@@ -90,11 +90,11 @@ export function searchPool(_pool: VideoPoolData | null, query: string, limit: nu
  * Get pool status for UI.
  */
 export async function getPoolStatus(): Promise<{ count: number; updatedAt: string | null }> {
-  const cnt = videosRepo.count();
+  const cnt = await videosRepo.count();
   if (cnt === 0) {
     return { count: 0, updatedAt: null };
   }
-  return { count: cnt, updatedAt: videosRepo.lastUpdatedAt() };
+  return { count: cnt, updatedAt: await videosRepo.lastUpdatedAt() };
 }
 
 /**
@@ -102,5 +102,5 @@ export async function getPoolStatus(): Promise<{ count: number; updatedAt: strin
  */
 export async function writePool(data: VideoPoolData): Promise<void> {
   const inserts = data.videos.filter((v) => v.id).map(videoToInsert);
-  videosRepo.replaceAll(inserts);
+  await videosRepo.replaceAll(inserts);
 }

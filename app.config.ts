@@ -4,7 +4,7 @@ export default defineConfig({
   vite: {
     server: {
       watch: {
-        ignored: ["**/data/**", "**/node_modules/**"],
+        ignored: ["**/node_modules/**"],
       },
     },
   },

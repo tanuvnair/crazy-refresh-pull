@@ -43,7 +43,7 @@ export async function addPositiveFeedback(videoId: string, metadata?: Partial<Vi
   if (!videoId || videoId.trim().length === 0) {
     throw new Error("Video ID is required");
   }
-  feedbackRepo.upsert({
+  await feedbackRepo.upsert({
     id: videoId.trim(),
     sentiment: "positive",
     title: metadata?.title,
@@ -64,7 +64,7 @@ export async function addNegativeFeedback(videoId: string, metadata?: Partial<Vi
   if (!videoId || videoId.trim().length === 0) {
     throw new Error("Video ID is required");
   }
-  feedbackRepo.upsert({
+  await feedbackRepo.upsert({
     id: videoId.trim(),
     sentiment: "negative",
     title: metadata?.title,
@@ -84,7 +84,7 @@ export async function removeFeedback(videoId: string): Promise<void> {
   if (!videoId || videoId.trim().length === 0) {
     throw new Error("Video ID is required");
   }
-  feedbackRepo.deleteById(videoId.trim());
+  await feedbackRepo.deleteById(videoId.trim());
 }
 
 // ---------- reads ----------
@@ -93,28 +93,28 @@ export async function removeFeedback(videoId: string): Promise<void> {
  * Get all positive feedback video IDs.
  */
 export async function getPositiveFeedback(): Promise<Set<string>> {
-  return new Set(feedbackRepo.findIdsBySentiment("positive"));
+  return new Set(await feedbackRepo.findIdsBySentiment("positive"));
 }
 
 /**
  * Get all negative feedback video IDs.
  */
 export async function getNegativeFeedback(): Promise<Set<string>> {
-  return new Set(feedbackRepo.findIdsBySentiment("negative"));
+  return new Set(await feedbackRepo.findIdsBySentiment("negative"));
 }
 
 /**
  * Get all positive feedback with metadata.
  */
 export async function getPositiveFeedbackWithMetadata(): Promise<Map<string, VideoMetadata>> {
-  return rowsToMetadataMap(feedbackRepo.findBySentiment("positive"));
+  return rowsToMetadataMap(await feedbackRepo.findBySentiment("positive"));
 }
 
 /**
  * Get all negative feedback with metadata.
  */
 export async function getNegativeFeedbackWithMetadata(): Promise<Map<string, VideoMetadata>> {
-  return rowsToMetadataMap(feedbackRepo.findBySentiment("negative"));
+  return rowsToMetadataMap(await feedbackRepo.findBySentiment("negative"));
 }
 
 /**
@@ -144,7 +144,7 @@ export async function getFeedbackSummary(): Promise<{
  * Get feedback status for a specific video.
  */
 export async function getVideoFeedbackStatus(videoId: string): Promise<"positive" | "negative" | null> {
-  return feedbackRepo.findSentimentById(videoId);
+  return await feedbackRepo.findSentimentById(videoId);
 }
 
 /**
@@ -153,5 +153,5 @@ export async function getVideoFeedbackStatus(videoId: string): Promise<"positive
 export async function getBatchVideoFeedbackStatus(
   videoIds: string[]
 ): Promise<Map<string, "positive" | "negative" | null>> {
-  return feedbackRepo.findSentimentsByIds(videoIds);
+  return await feedbackRepo.findSentimentsByIds(videoIds);
 }

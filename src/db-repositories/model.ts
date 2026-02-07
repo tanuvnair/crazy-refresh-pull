@@ -1,27 +1,30 @@
-import { getDb } from "~/services/db.server";
+import { sql, ensureSchema } from "~/services/db.server";
 
 /**
  * Get a value from the model key-value table.
  */
-export function getValue(key: string): string | null {
-  const row = getDb()
-    .prepare("SELECT value FROM model WHERE key = ?")
-    .get(key) as { value: string } | undefined;
-  return row?.value ?? null;
+export async function getValue(key: string): Promise<string | null> {
+  await ensureSchema();
+  const rows = await sql`SELECT value FROM model WHERE key = ${key}`;
+  if (rows.length === 0) return null;
+  return rows[0].value as string;
 }
 
 /**
  * Set a value in the model key-value table.
  */
-export function setValue(key: string, value: string): void {
-  getDb()
-    .prepare("INSERT OR REPLACE INTO model (key, value) VALUES (?, ?)")
-    .run(key, value);
+export async function setValue(key: string, value: string): Promise<void> {
+  await ensureSchema();
+  await sql`
+    INSERT INTO model (key, value) VALUES (${key}, ${value})
+    ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+  `;
 }
 
 /**
  * Delete a key from the model table.
  */
-export function deleteKey(key: string): void {
-  getDb().prepare("DELETE FROM model WHERE key = ?").run(key);
+export async function deleteKey(key: string): Promise<void> {
+  await ensureSchema();
+  await sql`DELETE FROM model WHERE key = ${key}`;
 }

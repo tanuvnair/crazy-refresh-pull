@@ -454,7 +454,7 @@ export async function searchVideosWithFiltering(
       const { readPool, searchPool } = await import("./video-pool.server");
       const pool = await readPool();
       if (pool.videos.length > 0) {
-        const candidates = searchPool(pool, query, POOL_SEARCH_LIMIT);
+        const candidates = await searchPool(pool, query, POOL_SEARCH_LIMIT);
         if (candidates.length > 0) {
           const filtered = await applyFiltersAndRank(
             candidates,
