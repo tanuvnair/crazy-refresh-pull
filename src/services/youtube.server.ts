@@ -462,7 +462,7 @@ export async function searchVideosWithFiltering(
             useCustomFiltering,
             authenticityThreshold
           );
-          if (filtered.length >= maxResults || filtered.length === candidates.length) {
+          if (filtered.length > 0) {
             console.log(
               `Served ${filtered.length} video(s) from pool (no API calls). Pool size: ${pool.videos.length}`
             );
