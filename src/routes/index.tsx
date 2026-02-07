@@ -447,12 +447,13 @@ export default function Home() {
       <Title>Crazy Refresh Pull</Title>
 
       <main class="flex min-h-screen flex-col">
-        <nav class="sticky top-0 z-40 border-b border-border bg-card shadow-[var(--shadow-apple-sm)]">
-          <div class="mx-auto flex min-h-[4.5rem] max-w-7xl items-center justify-between gap-6 px-6 py-5 flex-nowrap min-w-0 sm:px-8">
+        <nav class="sticky top-0 z-40 border-b border-border bg-card shadow-(--shadow-apple-sm)">
+          <div class="mx-auto flex min-h-18 max-w-7xl items-center justify-between gap-6 px-6 py-5 flex-nowrap min-w-0 sm:px-8">
             <h1 class="text-lg font-semibold tracking-tight text-foreground shrink-0 sm:text-xl">
               Crazy Refresh Pull
             </h1>
-            <div class="flex items-center gap-5 flex-nowrap min-w-0 shrink">
+
+            <div class="flex items-center gap-4 flex-nowrap min-w-0 shrink">
               <Input
                 id="search-query"
                 type="text"
@@ -473,18 +474,7 @@ export default function Home() {
                 {searchLoading() ? <Loader class="animate-spin" size={16} /> : <Search size={16} />}
                 <span class="hidden sm:inline">Search</span>
               </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                size="default"
-                onClick={handleRefreshFeed}
-                disabled={feedLoading()}
-                class="h-10 shrink-0 gap-2 px-3"
-                title="Load new random recommendations"
-              >
-                <RefreshCw size={16} class={feedLoading() ? "animate-spin" : ""} />
-                <span class="hidden sm:inline">Refresh</span>
-              </Button>
+
               <Button
                 type="button"
                 variant="link"
