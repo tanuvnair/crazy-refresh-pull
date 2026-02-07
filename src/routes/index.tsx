@@ -72,14 +72,18 @@ export default function Home() {
 
     try {
       // Load YouTube API key
-      let encrypted = getYouTubeApiKeyFromCookie();
+      let encrypted: string | null = getYouTubeApiKeyFromCookie();
       if (!encrypted) {
         encrypted = sessionStorage.getItem(YOUTUBE_API_KEY_STORAGE_KEY);
       }
       if (encrypted) {
-        const decrypted = decryptApiKey(encrypted);
-        if (decrypted) {
-          setYoutubeApiKey(decrypted);
+        try {
+          const decrypted = decryptApiKey(encrypted);
+          if (decrypted) {
+            setYoutubeApiKey(decrypted);
+          }
+        } catch (decErr) {
+          throw decErr;
         }
       }
 

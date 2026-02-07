@@ -1,4 +1,4 @@
-import { Component, JSX, splitProps } from "solid-js";
+import { children, Component, JSX, splitProps } from "solid-js";
 import { cn } from "~/lib/utils";
 
 export interface EmptyStateProps extends JSX.HTMLAttributes<HTMLDivElement> {
@@ -12,6 +12,8 @@ export interface EmptyStateProps extends JSX.HTMLAttributes<HTMLDivElement> {
 
 const EmptyState: Component<EmptyStateProps> = (props) => {
   const [local, others] = splitProps(props, ["title", "description", "action", "class", "children"]);
+  const resolvedAction = children(() => local.action);
+  const resolvedChildren = children(() => local.children);
 
   return (
     <div
@@ -25,10 +27,10 @@ const EmptyState: Component<EmptyStateProps> = (props) => {
       {local.description && (
         <p class="mt-1 text-sm">{local.description}</p>
       )}
-      {local.action && (
-        <div class="mt-4">{local.action}</div>
+      {resolvedAction() && (
+        <div class="mt-4">{resolvedAction()}</div>
       )}
-      {local.children}
+      {resolvedChildren()}
     </div>
   );
 };

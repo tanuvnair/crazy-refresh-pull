@@ -1,4 +1,4 @@
-import { Component, JSX, splitProps } from "solid-js";
+import { children, Component, JSX, splitProps } from "solid-js";
 import { cn } from "~/lib/utils";
 import { Info, AlertTriangle, AlertCircle } from "lucide-solid";
 
@@ -29,6 +29,7 @@ const variantIcon: Record<string, Component<{ class?: string }>> = {
 
 const Alert: Component<AlertProps> = (props) => {
   const [local, others] = splitProps(props, ["variant", "class", "children"]);
+  const resolved = children(() => local.children);
   const variant = () => local.variant || "default";
   const config = () => variantConfig[variant()];
   const Icon = variantIcon[local.variant || "default"];
@@ -44,7 +45,7 @@ const Alert: Component<AlertProps> = (props) => {
       {...others}
     >
       <Icon class={cn("mt-0.5 h-4 w-4 shrink-0", config().icon)} />
-      <p class="text-sm leading-relaxed">{local.children}</p>
+      <p class="text-sm leading-relaxed">{resolved()}</p>
     </div>
   );
 };

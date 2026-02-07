@@ -1,4 +1,4 @@
-import { Component, JSX, splitProps } from "solid-js";
+import { children, Component, JSX, splitProps } from "solid-js";
 import { cn } from "~/lib/utils";
 
 export interface TextProps extends JSX.HTMLAttributes<HTMLParagraphElement> {
@@ -8,6 +8,7 @@ export interface TextProps extends JSX.HTMLAttributes<HTMLParagraphElement> {
 
 const Text: Component<TextProps> = (props) => {
   const [local, others] = splitProps(props, ["variant", "muted", "class", "children"]);
+  const resolved = children(() => local.children);
 
   const variantClasses = {
     body: "text-lg font-normal leading-7",
@@ -29,7 +30,7 @@ const Text: Component<TextProps> = (props) => {
       )}
       {...others}
     >
-      {local.children}
+      {resolved()}
     </p>
   );
 };

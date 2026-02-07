@@ -1,4 +1,4 @@
-import { Component, JSX, splitProps } from "solid-js";
+import { children, Component, JSX, splitProps } from "solid-js";
 import { cn } from "~/lib/utils";
 
 export interface ButtonProps extends JSX.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -8,6 +8,7 @@ export interface ButtonProps extends JSX.ButtonHTMLAttributes<HTMLButtonElement>
 
 const Button: Component<ButtonProps> = (props) => {
   const [local, others] = splitProps(props, ["variant", "size", "class"]);
+  const resolved = children(() => props.children);
 
   const variantClasses = {
     default: "bg-primary text-white hover:bg-primary/90 active:bg-primary/95 shadow-apple-button hover:shadow-apple-button-hover active:shadow-none",
@@ -39,7 +40,7 @@ const Button: Component<ButtonProps> = (props) => {
       )}
       {...others}
     >
-      {props.children}
+      {resolved()}
     </button>
   );
 };
