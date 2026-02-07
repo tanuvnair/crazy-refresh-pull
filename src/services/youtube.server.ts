@@ -1,6 +1,23 @@
 import type { Video } from "~/components/video-card";
 import { applyFiltersAndRank } from "./apply-filters-rank.server";
 
+/** Decodes common HTML entities returned by the YouTube Data API. */
+function decodeHtmlEntities(text: string): string {
+  const entities: Record<string, string> = {
+    "&amp;": "&",
+    "&lt;": "<",
+    "&gt;": ">",
+    "&quot;": '"',
+    "&#39;": "'",
+    "&#x27;": "'",
+    "&apos;": "'",
+  };
+  return text.replace(
+    /&(?:amp|lt|gt|quot|apos|#39|#x27);/g,
+    (match) => entities[match] ?? match,
+  );
+}
+
 interface YouTubeSearchResponse {
   items: Array<{
     id: { videoId: string };
@@ -210,9 +227,9 @@ export async function searchYouTubeVideos(
     for (const item of searchData.items) {
       const videoId = item.id.videoId;
       const duration = durationMap.get(videoId);
-      const title = item.snippet.title;
-      const description = item.snippet.description;
-      const channelTitle = item.snippet.channelTitle;
+      const title = decodeHtmlEntities(item.snippet.title);
+      const description = decodeHtmlEntities(item.snippet.description);
+      const channelTitle = decodeHtmlEntities(item.snippet.channelTitle);
 
       // Filter out Shorts (videos shorter than configured minimum duration)
       // Content quality filtering is handled by custom AI filter if enabled
@@ -287,11 +304,11 @@ export async function getVideoById(
 
     return {
       id: item.id,
-      title: item.snippet.title,
-      description: item.snippet.description,
+      title: decodeHtmlEntities(item.snippet.title),
+      description: decodeHtmlEntities(item.snippet.description),
       thumbnail:
         item.snippet.thumbnails.high?.url || item.snippet.thumbnails.medium.url,
-      channelTitle: item.snippet.channelTitle,
+      channelTitle: decodeHtmlEntities(item.snippet.channelTitle),
       publishedAt: item.snippet.publishedAt,
       viewCount: item.statistics?.viewCount,
       likeCount: item.statistics?.likeCount,
