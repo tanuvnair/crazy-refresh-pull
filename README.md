@@ -26,12 +26,12 @@ flowchart LR
     VideoCard[VideoCard]
   end
   subgraph api [API Routes]
-    feed[/api/feed]
-    youtube[/api/youtube]
-    pool[/api/pool]
-    feedback[/api/feedback]
-    addVideo[/api/add-video]
-    train[/api/train-model]
+    feed["/api/feed"]
+    youtube["/api/youtube"]
+    pool["/api/pool"]
+    feedback["/api/feedback"]
+    addVideo["/api/add-video"]
+    train["/api/train-model"]
   end
   subgraph services [Services]
     videoPool[video-pool.server]
