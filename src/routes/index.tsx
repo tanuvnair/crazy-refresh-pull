@@ -29,7 +29,7 @@ export default function Home() {
   const [feedVideos, setFeedVideos] = createSignal<Video[]>([]);
   const [searchVideos, setSearchVideos] = createSignal<Video[]>([]);
   const [viewMode, setViewMode] = createSignal<"feed" | "search">("feed");
-  const [feedLoading, setFeedLoading] = createSignal(false);
+  const [feedLoading, setFeedLoading] = createSignal(true);
   const [searchLoading, setLoading] = createSignal(false);
   const [poolOnly, setPoolOnly] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
