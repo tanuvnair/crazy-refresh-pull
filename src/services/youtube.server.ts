@@ -111,6 +111,8 @@ export async function searchYouTubeVideos(
         userFriendlyError = `Invalid request: ${error}`;
       } else if (error.includes("401") || error.includes("Unauthorized")) {
         userFriendlyError = "Unauthorized. Please verify your YouTube API key is correct.";
+      } else if (error.includes("blocked") || error.includes("V3DataSearchService.List")) {
+        userFriendlyError = "YouTube Search API is blocked for this key. In Google Cloud Console: (1) Enable 'YouTube Data API v3' for your project, (2) Under API key restrictions, allow 'YouTube Data API v3' or use an unrestricted key for testing.";
       }
       
       throw new Error(userFriendlyError);
@@ -300,6 +302,8 @@ export interface SearchVideosOptions {
   maxPagesToSearch?: number;
   maxTotalVideosToFetch?: number;
   minVideoDurationSeconds?: number;
+  /** If true (default), search the local video pool first and only call the API when needed. */
+  usePoolFirst?: boolean;
 }
 
 export interface SearchVideosResult {
@@ -324,7 +328,8 @@ export async function handleYouTubeSearchRequest(request: Request): Promise<Resp
     let maxPagesToSearch = parseInt(url.searchParams.get("maxPagesToSearch") || "20", 10);
     let maxTotalVideosToFetch = parseInt(url.searchParams.get("maxTotalVideosToFetch") || "1000", 10);
     const minVideoDurationSeconds = parseInt(url.searchParams.get("minVideoDurationSeconds") || "60", 10);
-    
+    const usePoolFirst = url.searchParams.get("usePoolFirst") !== "false";
+
     // Enforce YouTube API quota limits
     // Max ~99 pages per day (10,000 units / 101 units per page), use 95 as safe limit
     maxPagesToSearch = Math.min(maxPagesToSearch, 95);
@@ -340,6 +345,7 @@ export async function handleYouTubeSearchRequest(request: Request): Promise<Resp
       maxPagesToSearch,
       maxTotalVideosToFetch,
       minVideoDurationSeconds,
+      usePoolFirst,
     });
 
     return new Response(JSON.stringify(result), {
@@ -368,42 +374,115 @@ export async function handleYouTubeSearchRequest(request: Request): Promise<Resp
 }
 
 /**
- * Search YouTube videos with optional custom AI filtering
- * This is the main business logic function that orchestrates the entire search flow
- * Continues fetching pages until we have enough results after filtering
+ * Apply feedback exclusion, custom filtering, and recommendation ranking to a list of videos.
+ * Shared by pool-first path and API path.
+ */
+async function applyFiltersAndRank(
+  videos: Video[],
+  maxResults: number,
+  useCustomFiltering: boolean,
+  authenticityThreshold: number
+): Promise<Video[]> {
+  let out = videos;
+  try {
+    const { getPositiveFeedback, getNegativeFeedback } = await import("./feedback.server");
+    const positiveFeedback = await getPositiveFeedback();
+    const negativeFeedback = await getNegativeFeedback();
+    const allFeedbackIds = new Set([...positiveFeedback, ...negativeFeedback]);
+    out = out.filter((video) => !allFeedbackIds.has(video.id));
+  } catch {
+    // Continue without feedback filter
+  }
+  if (useCustomFiltering && out.length > 0) {
+    try {
+      const { analyzeVideos, filterVideosByAnalysis } = await import("./filter.server");
+      const analysisResults = await analyzeVideos(out, authenticityThreshold);
+      out = await filterVideosByAnalysis(out, analysisResults, authenticityThreshold);
+    } catch {
+      // Keep current list
+    }
+  }
+  out = out.slice(0, maxResults);
+  try {
+    const { isModelAvailable, scoreVideo } = await import("./recommendation-model.server");
+    if (await isModelAvailable()) {
+      const scored = await Promise.all(
+        out.map(async (video) => ({
+          video,
+          score: (await scoreVideo(video)) ?? 0.5,
+        }))
+      );
+      scored.sort((a, b) => b.score - a.score);
+      out = scored.map((s) => s.video);
+    }
+  } catch {
+    // Keep order
+  }
+  return out;
+}
+
+/**
+ * Search YouTube videos with optional custom AI filtering.
+ * When usePoolFirst is true, searches the local video pool first (no API cost); falls back to API only when needed.
  */
 export async function searchVideosWithFiltering(
   options: SearchVideosOptions
 ): Promise<SearchVideosResult> {
-  const { 
-    query, 
-    youtubeApiKey, 
-    maxResults = 50, 
+  const {
+    query,
+    youtubeApiKey,
+    maxResults = 50,
     useCustomFiltering = true,
     authenticityThreshold = 0.4,
     maxPagesToSearch = 20,
     maxTotalVideosToFetch = 1000,
     minVideoDurationSeconds = 60,
+    usePoolFirst = true,
   } = options;
 
-  // Validate inputs
   if (!query || query.trim().length === 0) {
     throw new Error("Query parameter is required");
   }
-
   if (!youtubeApiKey || youtubeApiKey.trim().length === 0) {
     throw new Error("YouTube API key is required");
   }
 
+  const POOL_SEARCH_LIMIT = Math.max(maxResults * 5, 200);
+
+  if (usePoolFirst) {
+    try {
+      const { readPool, searchPool } = await import("./video-pool.server");
+      const pool = await readPool();
+      if (pool.videos.length > 0) {
+        const candidates = searchPool(pool, query, POOL_SEARCH_LIMIT);
+        if (candidates.length > 0) {
+          const filtered = await applyFiltersAndRank(
+            candidates,
+            maxResults,
+            useCustomFiltering,
+            authenticityThreshold
+          );
+          if (filtered.length >= maxResults || filtered.length === candidates.length) {
+            console.log(
+              `Served ${filtered.length} video(s) from pool (no API calls). Pool size: ${pool.videos.length}`
+            );
+            return { videos: filtered };
+          }
+        }
+      }
+    } catch (poolErr) {
+      console.warn("Pool search failed, falling back to API:", poolErr);
+    }
+  }
+
   const MAX_TOTAL_FETCH = maxTotalVideosToFetch;
-  const VIDEOS_PER_PAGE = 50; // YouTube API max per request
+  const VIDEOS_PER_PAGE = 50;
   let allFetchedVideos: Video[] = [];
   let nextPageToken: string | undefined = undefined;
   let totalFetched = 0;
   let pageCount = 0;
   const MAX_PAGES = maxPagesToSearch;
 
-  // Keep fetching pages until we have enough results after filtering
   while (allFetchedVideos.length < maxResults && totalFetched < MAX_TOTAL_FETCH && pageCount < MAX_PAGES) {
     pageCount++;
     
@@ -465,9 +544,36 @@ export async function searchVideosWithFiltering(
     }
   }
 
-  // Limit final results
-  const videos = allFetchedVideos.slice(0, maxResults);
-  
+  if (allFetchedVideos.length > 0) {
+    try {
+      const { addToPool } = await import("./video-pool.server");
+      const { added, total } = await addToPool(allFetchedVideos);
+      if (added > 0) {
+        console.log(`Pool updated: +${added} new videos (total ${total}). Future searches can use them without API calls.`);
+      }
+    } catch (poolErr) {
+      console.warn("Failed to update pool:", poolErr);
+    }
+  }
+
+  let videos = allFetchedVideos.slice(0, maxResults);
+
+  try {
+    const { isModelAvailable, scoreVideo } = await import("./recommendation-model.server");
+    if (await isModelAvailable()) {
+      const scored = await Promise.all(
+        videos.map(async (video) => ({
+          video,
+          score: (await scoreVideo(video)) ?? 0.5,
+        }))
+      );
+      scored.sort((a, b) => b.score - a.score);
+      videos = scored.map((s) => s.video);
+    }
+  } catch (recommendationError) {
+    console.warn("Recommendation model ranking skipped:", recommendationError);
+  }
+
   if (videos.length === 0 && totalFetched > 0) {
     console.log(`Searched through ${totalFetched} videos across ${pageCount} page(s) but found no authentic videos after filtering`);
   } else if (videos.length > 0) {

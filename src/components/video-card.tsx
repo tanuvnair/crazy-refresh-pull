@@ -17,6 +17,8 @@ export interface Video {
 
 export interface VideoCardProps {
   video: Video;
+  /** Called after feedback (like/dislike/remove) is successfully updated. Use to refresh model status. */
+  onFeedbackChange?: () => void;
 }
 
 const VideoCard: Component<VideoCardProps> = (props) => {
@@ -72,6 +74,7 @@ const VideoCard: Component<VideoCardProps> = (props) => {
       if (response.ok) {
         const data = await response.json();
         setFeedbackStatus(data.status);
+        props.onFeedbackChange?.();
       } else {
         console.error("Failed to update feedback");
       }

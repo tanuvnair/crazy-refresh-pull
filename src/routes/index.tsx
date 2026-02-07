@@ -3,7 +3,7 @@ import { createSignal, onMount } from "solid-js";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Label, Checkbox } from "~/components/ui";
 import { Button } from "~/components/ui";
 import { Input } from "~/components/ui";
-import { Search, Loader2, Key, Eye, EyeOff, X, Loader, Brain, Save, Heart, Plus, Settings } from "lucide-solid";
+import { Search, Loader2, Key, Eye, EyeOff, X, Loader, Brain, Save, Heart, Plus, Settings, Sparkles, Database } from "lucide-solid";
 import VideoCard, { type Video } from "~/components/video-card";
 import { encryptApiKey, decryptApiKey } from "~/lib/encryption";
 import { getYouTubeApiKeyFromCookie, saveYouTubeApiKeyToCookie } from "~/lib/cookie";
@@ -33,6 +33,17 @@ export default function Home() {
   const [favoriteVideoUrl, setFavoriteVideoUrl] = createSignal("");
   const [addingFavorite, setAddingFavorite] = createSignal(false);
   const [showSettings, setShowSettings] = createSignal(false);
+  const [modelStatus, setModelStatus] = createSignal<{
+    available: boolean;
+    positiveCount: number;
+    negativeCount: number;
+    trainedAt: string | null;
+  } | null>(null);
+  const [trainingModel, setTrainingModel] = createSignal(false);
+  const [poolStatus, setPoolStatus] = createSignal<{ count: number; updatedAt: string | null } | null>(null);
+  const [seedingPool, setSeedingPool] = createSignal(false);
+  const [poolSeedQueries, setPoolSeedQueries] = createSignal("documentary, cooking, travel");
+  const [poolPagesPerQuery, setPoolPagesPerQuery] = createSignal(2);
   // YouTube API quota limits:
   // - Default daily quota: 10,000 units
   // - search.list: 100 units per request
@@ -49,7 +60,7 @@ export default function Home() {
   });
 
   // Load API keys and settings from storage on mount
-  onMount(() => {
+  onMount(async () => {
     // Only clear error and videos on actual page load, not on hot reload
     // This prevents search results from disappearing during HMR
     if (!hasMountedBefore) {
@@ -78,6 +89,32 @@ export default function Home() {
       }
 
       // Load filter settings
+      // Load recommendation model status
+      try {
+        const statusRes = await fetch("/api/train-model");
+        if (statusRes.ok) {
+          const data = await statusRes.json();
+          setModelStatus({
+            available: data.available ?? false,
+            positiveCount: data.positiveCount ?? 0,
+            negativeCount: data.negativeCount ?? 0,
+            trainedAt: data.trainedAt ?? null,
+          });
+        }
+      } catch {
+        // Ignore
+      }
+
+      try {
+        const poolRes = await fetch("/api/pool");
+        if (poolRes.ok) {
+          const data = await poolRes.json();
+          setPoolStatus({ count: data.count ?? 0, updatedAt: data.updatedAt ?? null });
+        }
+      } catch {
+        // Ignore
+      }
+
       const settingsJson = sessionStorage.getItem(FILTER_SETTINGS_KEY);
       if (settingsJson) {
         try {
@@ -152,6 +189,98 @@ export default function Home() {
     }
   };
 
+  const handleTrainModel = async () => {
+    setTrainingModel(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/train-model", { method: "POST" });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message ?? data.error ?? "Failed to train model");
+      }
+      setModelStatus({
+        available: data.success ? true : modelStatus()?.available ?? false,
+        positiveCount: data.positiveCount ?? modelStatus()?.positiveCount ?? 0,
+        negativeCount: data.negativeCount ?? modelStatus()?.negativeCount ?? 0,
+        trainedAt: data.success ? new Date().toISOString() : (modelStatus()?.trainedAt ?? null),
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to train model");
+    } finally {
+      setTrainingModel(false);
+    }
+  };
+
+  const refreshModelStatus = async () => {
+    try {
+      const statusRes = await fetch("/api/train-model");
+      if (statusRes.ok) {
+        const data = await statusRes.json();
+        setModelStatus({
+          available: data.available ?? false,
+          positiveCount: data.positiveCount ?? 0,
+          negativeCount: data.negativeCount ?? 0,
+          trainedAt: data.trainedAt ?? null,
+        });
+      }
+    } catch {
+      // Ignore
+    }
+  };
+
+  const refreshPoolStatus = async () => {
+    try {
+      const res = await fetch("/api/pool");
+      if (res.ok) {
+        const data = await res.json();
+        setPoolStatus({ count: data.count ?? 0, updatedAt: data.updatedAt ?? null });
+      }
+    } catch {
+      // Ignore
+    }
+  };
+
+  const handleSeedPool = async () => {
+    const youtubeKey = youtubeApiKey().trim();
+    const queriesRaw = poolSeedQueries().trim();
+    if (!youtubeKey) {
+      setError("Enter your YouTube API key first");
+      return;
+    }
+    if (!queriesRaw) {
+      setError("Enter at least one search term (comma-separated)");
+      return;
+    }
+    const queries = queriesRaw.split(",").map((q) => q.trim()).filter(Boolean);
+    if (queries.length === 0) {
+      setError("Enter at least one search term");
+      return;
+    }
+    setSeedingPool(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/pool", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          apiKey: youtubeKey,
+          queries,
+          maxPagesPerQuery: poolPagesPerQuery(),
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message ?? data.error ?? "Failed to seed pool");
+      }
+      await refreshPoolStatus();
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to seed pool");
+    } finally {
+      setSeedingPool(false);
+    }
+  };
+
   // Add favorite video by URL
   const handleAddFavoriteVideo = async () => {
     const url = favoriteVideoUrl().trim();
@@ -190,8 +319,7 @@ export default function Home() {
       const data = await response.json();
       setFavoriteVideoUrl("");
       setError(null);
-      // Show success message (you could add a success state if needed)
-      console.log("Video added to favorites:", data.video.title);
+      refreshModelStatus();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to add video to favorites");
     } finally {
@@ -245,6 +373,7 @@ export default function Home() {
       params.set("maxPagesToSearch", settings.maxPagesToSearch.toString());
       params.set("maxTotalVideosToFetch", settings.maxTotalVideosToFetch.toString());
       params.set("minVideoDurationSeconds", settings.minVideoDurationSeconds.toString());
+      params.set("usePoolFirst", "true");
 
       const response = await fetch(`/api/youtube?${params.toString()}`);
 
@@ -279,6 +408,7 @@ export default function Home() {
       }
 
       setVideos(data.videos || []);
+      refreshPoolStatus();
       if (data.videos && data.videos.length === 0) {
         setError("No authentic videos found. Try a different search term.");
       }
@@ -547,7 +677,7 @@ export default function Home() {
                   Add Favorite Video
                 </Label>
                 <p class="text-xs text-muted-foreground">
-                  Paste a YouTube URL or video ID to add it to your favorites. This helps the AI learn your preferences.
+                  Paste a YouTube URL or video ID to add it to your favorites (positive) or use thumbs down on search results for negative feedback. This data trains your recommendation model.
                 </p>
                 <div class="flex flex-row gap-2">
                   <Input
@@ -579,6 +709,111 @@ export default function Home() {
                     )}
                     <span>Add</span>
                   </Button>
+                </div>
+              </div>
+
+              <div class="flex flex-col gap-4">
+                <Label>
+                  <Database class="h-4 w-4 text-primary" />
+                  Video pool (fewer API calls)
+                </Label>
+                <p class="text-xs text-muted-foreground">
+                  Seed a local cache with videos from YouTube once. Searches then use the pool first and only call the API when needed. Saves quota for testing filtering and recommendations.
+                </p>
+                <div class="flex flex-wrap items-center gap-3">
+                  {poolStatus() && (() => {
+                    const ps = poolStatus()!;
+                    return (
+                      <span class="text-sm text-muted-foreground">
+                        Pool: {ps.count} video(s)
+                        {ps.updatedAt != null ? `, updated ${new Date(ps.updatedAt).toLocaleString()}` : ""}
+                      </span>
+                    );
+                  })()}
+                </div>
+                <div class="flex flex-col gap-2">
+                  <Label for="pool-seed-queries" class="text-sm">
+                    Seed with search terms (comma-separated)
+                  </Label>
+                  <Input
+                    id="pool-seed-queries"
+                    type="text"
+                    placeholder="documentary, cooking, travel"
+                    value={poolSeedQueries()}
+                    onInput={(e) => setPoolSeedQueries(e.currentTarget.value)}
+                    disabled={seedingPool() || loading()}
+                  />
+                  <div class="flex items-center gap-2">
+                    <Label for="pool-pages" class="text-sm">
+                      Pages per term:
+                    </Label>
+                    <Input
+                      id="pool-pages"
+                      type="number"
+                      min="1"
+                      max="5"
+                      value={poolPagesPerQuery()}
+                      onInput={(e) => setPoolPagesPerQuery(parseInt(e.currentTarget.value, 10) || 2)}
+                      disabled={seedingPool() || loading()}
+                      class="w-20"
+                    />
+                    <span class="text-xs text-muted-foreground">
+                      (~101 API units per page)
+                    </span>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="default"
+                    onClick={handleSeedPool}
+                    disabled={seedingPool() || loading() || !youtubeApiKey().trim()}
+                    class="flex items-center gap-2 self-start"
+                  >
+                    {seedingPool() ? (
+                      <Loader class="animate-spin" size={16} />
+                    ) : (
+                      <Database size={16} />
+                    )}
+                    <span>Seed pool</span>
+                  </Button>
+                </div>
+              </div>
+
+              <div class="flex flex-col gap-4">
+                <Label>
+                  <Sparkles class="h-4 w-4 text-primary" />
+                  Recommendation model (watch while eating)
+                </Label>
+                <p class="text-xs text-muted-foreground">
+                  Train a model on your likes and dislikes. Once trained, search results are re-ranked so videos that match your taste appear first.
+                </p>
+                <div class="flex flex-wrap items-center gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="default"
+                    onClick={handleTrainModel}
+                    disabled={
+                      trainingModel() ||
+                      (modelStatus()?.positiveCount ?? 0) < 2 ||
+                      (modelStatus()?.negativeCount ?? 0) < 2
+                    }
+                    class="flex items-center gap-2"
+                  >
+                    {trainingModel() ? (
+                      <Loader class="animate-spin" size={16} />
+                    ) : (
+                      <Sparkles size={16} />
+                    )}
+                    <span>Train model</span>
+                  </Button>
+                  {modelStatus() && (
+                    <span class="text-sm text-muted-foreground">
+                      {modelStatus()!.available
+                        ? `Trained on ${modelStatus()!.positiveCount} likes, ${modelStatus()!.negativeCount} dislikes. Results are ranked by your preferences.`
+                        : `Add at least 2 likes and 2 dislikes to train (you have ${modelStatus()!.positiveCount} likes, ${modelStatus()!.negativeCount} dislikes).`}
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -637,7 +872,7 @@ export default function Home() {
               </h2>
               <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {videos().map((video) => (
-                  <VideoCard video={video} />
+                  <VideoCard video={video} onFeedbackChange={refreshModelStatus} />
                 ))}
               </div>
             </div>
