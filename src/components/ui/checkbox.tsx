@@ -20,8 +20,8 @@ const Checkbox: Component<CheckboxProps> = (props) => {
           local.class
         )}
         style={{
-          "background-color": local.checked ? "hsl(217 91% 60%)" : "hsl(var(--background))",
-          "border-color": local.checked ? "hsl(217 91% 60%)" : "hsl(var(--input) / 0.6)",
+          "background-color": local.checked ? "hsl(var(--primary))" : "hsl(var(--background))",
+          "border-color": local.checked ? "hsl(var(--primary))" : "hsl(var(--input) / 0.6)",
         }}
         {...others}
       />

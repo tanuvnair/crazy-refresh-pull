@@ -2,7 +2,7 @@ import { Component, JSX, splitProps } from "solid-js";
 import { cn } from "~/lib/utils";
 
 export interface ButtonProps extends JSX.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "default" | "secondary" | "outline" | "ghost" | "destructive";
+  variant?: "default" | "secondary" | "outline" | "ghost" | "link" | "destructive";
   size?: "default" | "xs" | "sm" | "lg" | "icon";
 }
 
@@ -14,6 +14,7 @@ const Button: Component<ButtonProps> = (props) => {
     secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80 active:bg-secondary/90",
     outline: "border border-border/60 bg-background text-foreground hover:bg-accent/50 hover:border-border active:bg-accent",
     ghost: "text-foreground hover:bg-accent/50 active:bg-accent",
+    link: "text-primary underline-offset-4 hover:underline bg-transparent shadow-none",
     destructive: "bg-destructive text-white hover:bg-destructive/90 active:bg-destructive/95 shadow-apple-button hover:shadow-apple-button-hover active:shadow-none",
   };
 
@@ -25,32 +26,10 @@ const Button: Component<ButtonProps> = (props) => {
     icon: "h-11 w-11",
   };
 
-  const getButtonStyle = () => {
-    const variant = local.variant || "default";
-    const styles: Record<string, string> = {};
-
-    if (variant === "default") {
-      styles.backgroundColor = "hsl(var(--primary))";
-      styles.color = "white";
-    } else if (variant === "destructive") {
-      styles.backgroundColor = "hsl(var(--destructive))";
-      styles.color = "white";
-    } else if (variant === "secondary") {
-      styles.backgroundColor = "hsl(var(--secondary))";
-      styles.color = "hsl(var(--secondary-foreground))";
-    } else if (variant === "outline") {
-      styles.backgroundColor = "hsl(var(--background))";
-      styles.color = "hsl(var(--foreground))";
-      styles.borderColor = "hsl(var(--border))";
-    }
-
-    return Object.keys(styles).length > 0 ? { style: styles } : {};
-  };
-
   return (
     <button
       class={cn(
-        "inline-flex items-center justify-center rounded-lg font-medium",
+        "inline-flex items-center justify-center rounded-lg font-medium transition-[color,background-color,border-color,box-shadow]",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2",
         "disabled:pointer-events-none disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none",
         "select-none",
@@ -58,7 +37,6 @@ const Button: Component<ButtonProps> = (props) => {
         sizeClasses[local.size || "default"],
         local.class
       )}
-      {...getButtonStyle()}
       {...others}
     >
       {props.children}

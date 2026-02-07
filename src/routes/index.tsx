@@ -1,9 +1,7 @@
 import { Title } from "@solidjs/meta";
 import { createSignal, onMount } from "solid-js";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, Label, Checkbox } from "~/components/ui";
-import { Button } from "~/components/ui";
-import { Input } from "~/components/ui";
-import { Search, Loader2, Key, Eye, EyeOff, X, Loader, Brain, Save, Heart, Plus, Settings, Sparkles, Database } from "lucide-solid";
+import { Alert, Button, Checkbox, Dialog, DialogContent, DialogHeader, DialogBody, DialogFooter, DialogTitle, DialogDescription, EmptyState, Input, SettingsSection, SettingsGroup, SettingsRow, SettingsContentRow, Text } from "~/components/ui";
+import { Search, Eye, EyeOff, Loader, Plus, Settings, Sparkles, Database, RefreshCw, ArrowLeft } from "lucide-solid";
 import VideoCard, { type Video } from "~/components/video-card";
 import { encryptApiKey, decryptApiKey } from "~/lib/encryption";
 import { getYouTubeApiKeyFromCookie, saveYouTubeApiKeyToCookie } from "~/lib/cookie";
@@ -27,8 +25,12 @@ export default function Home() {
   const [showYoutubeApiKey, setShowYoutubeApiKey] = createSignal(false);
   const [useCustomFiltering, setUseCustomFiltering] = createSignal(true);
   const [searchQuery, setSearchQuery] = createSignal("");
-  const [videos, setVideos] = createSignal<Video[]>([]);
-  const [loading, setLoading] = createSignal(false);
+  const [feedVideos, setFeedVideos] = createSignal<Video[]>([]);
+  const [searchVideos, setSearchVideos] = createSignal<Video[]>([]);
+  const [viewMode, setViewMode] = createSignal<"feed" | "search">("feed");
+  const [feedLoading, setFeedLoading] = createSignal(false);
+  const [searchLoading, setLoading] = createSignal(false);
+  const [poolOnly, setPoolOnly] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
   const [favoriteVideoUrl, setFavoriteVideoUrl] = createSignal("");
   const [addingFavorite, setAddingFavorite] = createSignal(false);
@@ -61,11 +63,10 @@ export default function Home() {
 
   // Load API keys and settings from storage on mount
   onMount(async () => {
-    // Only clear error and videos on actual page load, not on hot reload
-    // This prevents search results from disappearing during HMR
     if (!hasMountedBefore) {
       setError(null);
-      setVideos([]);
+      setFeedVideos([]);
+      setSearchVideos([]);
       hasMountedBefore = true;
     }
 
@@ -137,7 +138,40 @@ export default function Home() {
     } catch (err) {
       console.error("Failed to load API keys from storage:", err);
     }
+
+    loadFeed();
   });
+
+  const buildFeedParams = () => {
+    const params = new URLSearchParams({ limit: "20" });
+    const key = youtubeApiKey().trim();
+    if (key) params.set("apiKey", key);
+    params.set("useCustomFiltering", useCustomFiltering() ? "true" : "false");
+    params.set("authenticityThreshold", filterSettings().authenticityThreshold.toString());
+    return params;
+  };
+
+  const loadFeed = async () => {
+    setFeedLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/feed?${buildFeedParams().toString()}`);
+      if (!res.ok) throw new Error("Failed to load feed");
+      const data = await res.json();
+      setFeedVideos(data.videos ?? []);
+      setPoolOnly(Boolean(data.poolOnly));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load feed");
+      setFeedVideos([]);
+    } finally {
+      setFeedLoading(false);
+    }
+  };
+
+  const handleRefreshFeed = () => {
+    setViewMode("feed");
+    loadFeed();
+  };
 
   // Update YouTube API key state (without saving)
   const handleYoutubeApiKeyChange = (value: string) => {
@@ -329,20 +363,13 @@ export default function Home() {
 
 
   const handleSearch = async () => {
-    // Get the actual value from the input element to handle SSR hydration issues
     const inputElement = document.getElementById("search-query") as HTMLInputElement;
     const query = inputElement ? inputElement.value.trim() : searchQuery().trim();
     const youtubeKey = youtubeApiKey().trim();
     const useCustom = useCustomFiltering();
 
-    // Sync the input value back to the signal if there's a mismatch
     if (inputElement && inputElement.value !== searchQuery()) {
       setSearchQuery(inputElement.value);
-    }
-
-    if (!youtubeKey) {
-      setError("Please enter your YouTube API key");
-      return;
     }
 
     if (!query) {
@@ -352,22 +379,16 @@ export default function Home() {
 
     setLoading(true);
     setError(null);
-    setVideos([]);
+    setSearchVideos([]);
+    setViewMode("search");
 
     try {
       const params = new URLSearchParams({
         q: query,
         maxResults: "50",
-        apiKey: youtubeKey,
       });
-
-      if (useCustom) {
-        params.set("useCustomFiltering", "true");
-      } else {
-        params.set("useCustomFiltering", "false");
-      }
-
-      // Add filter settings to request
+      if (youtubeKey) params.set("apiKey", youtubeKey);
+      params.set("useCustomFiltering", useCustom ? "true" : "false");
       const settings = filterSettings();
       params.set("authenticityThreshold", settings.authenticityThreshold.toString());
       params.set("maxPagesToSearch", settings.maxPagesToSearch.toString());
@@ -380,37 +401,25 @@ export default function Home() {
       if (!response.ok) {
         let errorMessage = "Failed to fetch videos";
         try {
-          // Read as text first, then try to parse as JSON
           const text = await response.text();
           try {
             const errorData = JSON.parse(text);
             errorMessage = errorData.error || errorData.message || errorMessage;
           } catch {
-            // If not JSON, use the text as error message
             errorMessage = text || errorMessage;
           }
         } catch {
-          // If we can't read the response, use default message
           errorMessage = `HTTP ${response.status}: ${response.statusText}`;
         }
         throw new Error(errorMessage);
       }
 
-      let data;
-      try {
-        const contentType = response.headers.get("content-type");
-        if (!contentType || !contentType.includes("application/json")) {
-          throw new Error("Response is not JSON");
-        }
-        data = await response.json();
-      } catch (parseError) {
-        throw new Error("Invalid response from server. Please try again.");
-      }
-
-      setVideos(data.videos || []);
+      const data = await response.json();
+      setSearchVideos(data.videos || []);
+      setPoolOnly(Boolean(data.poolOnly));
       refreshPoolStatus();
       if (data.videos && data.videos.length === 0) {
-        setError("No authentic videos found. Try a different search term.");
+        setError("No videos found. Try a different search term or seed the pool in Settings.");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred while searching");
@@ -425,460 +434,294 @@ export default function Home() {
     }
   };
 
+  const displayVideos = () => (viewMode() === "feed" ? feedVideos() : searchVideos());
+  const isLoading = () => (viewMode() === "feed" ? feedLoading() : searchLoading());
+
   return (
     <>
       <Title>Crazy Refresh Pull</Title>
 
-      <main class="flex min-h-screen items-start justify-center py-8 px-4">
-        <div class="mx-auto max-w-7xl w-full flex flex-col gap-12">
-          <Card>
-            <CardHeader>
-              <CardTitle>Get Started</CardTitle>
-              <CardDescription>
-                Enter your YouTube API key and search preferences to find amazing refresh pulls
-              </CardDescription>
-            </CardHeader>
+      <main class="flex min-h-screen flex-col">
+        <nav class="sticky top-0 z-40 border-b border-border bg-card shadow-[var(--shadow-apple-sm)]">
+          <div class="mx-auto flex min-h-[4.5rem] max-w-7xl items-center justify-between gap-6 px-6 py-5 flex-nowrap min-w-0 sm:px-8">
+            <h1 class="text-lg font-semibold tracking-tight text-foreground shrink-0 sm:text-xl">
+              Crazy Refresh Pull
+            </h1>
+            <div class="flex items-center gap-5 flex-nowrap min-w-0 shrink">
+              <Input
+                id="search-query"
+                type="text"
+                placeholder="Search (pool or YouTube)..."
+                class="h-10 w-56 min-w-0 shrink rounded-md border-input bg-background sm:w-80"
+                value={searchQuery()}
+                onInput={(e) => setSearchQuery(e.currentTarget.value)}
+                onKeyPress={handleKeyPress}
+                disabled={searchLoading()}
+              />
+              <Button
+                type="button"
+                size="default"
+                onClick={handleSearch}
+                disabled={searchLoading()}
+                class="h-10 shrink-0 gap-2 px-4"
+              >
+                {searchLoading() ? <Loader class="animate-spin" size={16} /> : <Search size={16} />}
+                <span class="hidden sm:inline">Search</span>
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                size="default"
+                onClick={handleRefreshFeed}
+                disabled={feedLoading()}
+                class="h-10 shrink-0 gap-2 px-3"
+                title="Load new random recommendations"
+              >
+                <RefreshCw size={16} class={feedLoading() ? "animate-spin" : ""} />
+                <span class="hidden sm:inline">Refresh</span>
+              </Button>
+              <Button
+                type="button"
+                variant="link"
+                size="default"
+                onClick={() => setShowSettings(true)}
+                class="h-10 shrink-0 gap-2 px-3"
+                title="Settings"
+              >
+                <Settings size={16} />
+                <span class="hidden sm:inline">Settings</span>
+              </Button>
+            </div>
+          </div>
+        </nav>
 
-            <CardContent class="flex flex-col gap-8">
-              <div class="flex flex-col gap-4">
-                <Label
-                  for="youtube-api-key"
-                >
-                  <Key class="h-4 w-4 text-primary" />
-                  YouTube API Key
-                </Label>
+        <div class="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6">
+          {poolOnly() && (
+            <Alert variant="warning">
+              Showing pooled videos only. Add a YouTube API key in Settings to search YouTube and seed more videos.
+            </Alert>
+          )}
 
-                <div class="flex flex-row gap-2">
-                  <div class="relative flex-1">
-                    <Input
-                      id="youtube-api-key"
-                      type={showYoutubeApiKey() ? "text" : "password"}
-                      placeholder="Enter your YouTube Data API v3 key"
-                      class="w-full pr-20"
-                      value={youtubeApiKey()}
-                      onInput={(e) => handleYoutubeApiKeyChange(e.currentTarget.value)}
-                      disabled={loading()}
-                    />
-                    <div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setShowYoutubeApiKey(!showYoutubeApiKey())}
-                        title={showYoutubeApiKey() ? "Hide API key" : "Show API key"}
-                        disabled={loading()}
-                      >
-                        {showYoutubeApiKey() ? (
-                          <EyeOff class="text-muted-foreground hover:text-foreground" />
-                        ) : (
-                          <Eye class="text-muted-foreground hover:text-foreground" />
-                        )}
-                      </Button>
+          {error() && (
+            <Alert variant="destructive">
+              {error()}
+            </Alert>
+          )}
 
-                      {youtubeApiKey() && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={handleClearYoutubeApiKey}
-                          title="Clear API key"
-                          disabled={loading()}
-                        >
-                          <X class="text-muted-foreground hover:text-foreground" />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="default"
-                    onClick={handleSaveYoutubeApiKey}
-                    disabled={loading() || !youtubeApiKey().trim()}
-                    class="flex items-center gap-2"
-                  >
-                    <Save size={16} />
-                    <span>Save</span>
-                  </Button>
-                </div>
+          {viewMode() === "search" && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => { setViewMode("feed"); setError(null); }}
+              class="self-start gap-2"
+            >
+              <ArrowLeft size={16} />
+              Back to feed
+            </Button>
+          )}
 
-                <p class="text-xs text-muted-foreground">
-                  Get your API key from{" "}
-                  <a
-                    href="https://console.cloud.google.com/apis/credentials"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="text-primary hover:underline"
-                  >
-                    Google Cloud Console
-                  </a>
-                  <span class="text-xs text-muted-foreground">
-                    .{" "}We do not store your API key. It is encrypted and stored in your browser locally.
-                  </span>
-                </p>
-              </div>
-
-              <div class="flex flex-col gap-2">
-                <div class="flex items-center justify-between">
-                  <div class="flex items-center gap-2">
-                    <Checkbox
-                      id="use-custom-filtering"
-                      checked={useCustomFiltering()}
-                      onChange={(e) => handleCustomFilteringToggle(e.currentTarget.checked)}
-                      disabled={loading()}
-                    />
-
-                    <Label
-                      for="use-custom-filtering"
-                      class="text-sm font-normal cursor-pointer"
-                      selectable={false}
-                    >
-                      <Brain class="h-4 w-4 text-primary inline" />
-                      Use AI-powered content filtering
-                    </Label>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="xs"
-                    onClick={() => setShowSettings(!showSettings())}
-                    disabled={loading()}
-                    class="flex items-center gap-2"
-                  >
-                    <Settings size={16} />
-                    <span>Settings</span>
-                  </Button>
-                </div>
-
-                <p class="text-xs text-muted-foreground">
-                  Our custom AI filter analyzes video titles, descriptions, and engagement metrics to identify authentic, high-quality content versus "slop" or manufactured content. The filter learns from your feedback to improve over time.
-                </p>
-
-                {showSettings() && (
-                  <div class="p-4 border border-border rounded-lg bg-muted/50 flex flex-col gap-4">
-                    <Label>
-                      <Settings class="h-4 w-4 text-primary inline mr-1" />
-                      Filter Settings
-                    </Label>
-
-                    <div class="flex flex-col gap-3">
-                      <div class="flex flex-col gap-2">
-                        <Label for="authenticity-threshold" class="text-sm">
-                          Authenticity Threshold: {filterSettings().authenticityThreshold.toFixed(2)}
-                        </Label>
-                        <div class="relative w-full">
-                          <Input
-                            id="authenticity-threshold"
-                            type="range"
-                            min="0"
-                            max="1"
-                            step="0.05"
-                            value={filterSettings().authenticityThreshold}
-                            onInput={(e) => {
-                              const value = parseFloat(e.currentTarget.value);
-                              handleFilterSettingsChange("authenticityThreshold", value);
-                              // Update the fill percentage
-                              const percentage = (value / 1) * 100;
-                              e.currentTarget.style.setProperty("--fill-percentage", `${percentage}%`);
-                            }}
-                            disabled={loading()}
-                            class="slider-with-fill"
-                            style={`--fill-percentage: ${(filterSettings().authenticityThreshold / 1) * 100}%`}
-                          />
-                        </div>
-                        <p class="text-xs text-muted-foreground">
-                          Lower = more lenient (0.0-1.0). Videos below this score are filtered out.
-                        </p>
-                      </div>
-
-                      <div class="flex flex-col gap-2">
-                        <Label for="max-pages" class="text-sm">
-                          Max Pages to Search: {filterSettings().maxPagesToSearch}
-                        </Label>
-                        <Input
-                          id="max-pages"
-                          type="number"
-                          min="1"
-                          max="95"
-                          value={filterSettings().maxPagesToSearch}
-                          onInput={(e) => {
-                            const value = parseInt(e.currentTarget.value) || 20;
-                            const maxAllowed = 95; // YouTube API quota limit
-                            const clampedValue = Math.max(1, Math.min(value, maxAllowed));
-                            if (clampedValue !== filterSettings().maxPagesToSearch) {
-                              handleFilterSettingsChange("maxPagesToSearch", clampedValue);
-                            }
-                          }}
-                          disabled={loading()}
-                        />
-                        <p class="text-xs text-muted-foreground">
-                          Maximum number of pages to search (each page costs ~101 API units). Max 95 pages to respect YouTube API daily quota (10,000 units).
-                        </p>
-                      </div>
-
-                      <div class="flex flex-col gap-2">
-                        <Label for="max-total-videos" class="text-sm">
-                          Max Total Videos to Fetch: {filterSettings().maxTotalVideosToFetch}
-                        </Label>
-                        <Input
-                          id="max-total-videos"
-                          type="number"
-                          min="50"
-                          max="4750"
-                          step="50"
-                          value={filterSettings().maxTotalVideosToFetch}
-                          onInput={(e) => {
-                            const value = parseInt(e.currentTarget.value) || 1000;
-                            const maxAllowed = 4750; // YouTube API quota limit (95 pages * 50 videos)
-                            const clampedValue = Math.max(50, Math.min(value, maxAllowed));
-                            if (clampedValue !== filterSettings().maxTotalVideosToFetch) {
-                              handleFilterSettingsChange("maxTotalVideosToFetch", clampedValue);
-                            }
-                          }}
-                          disabled={loading()}
-                        />
-                        <p class="text-xs text-muted-foreground">
-                          Maximum total videos to fetch (max 4,750 to respect YouTube API daily quota of 10,000 units).
-                        </p>
-                      </div>
-
-                      <div class="flex flex-col gap-2">
-                        <Label for="min-duration" class="text-sm">
-                          Minimum Video Duration (seconds): {filterSettings().minVideoDurationSeconds}
-                        </Label>
-                        <Input
-                          id="min-duration"
-                          type="number"
-                          min="0"
-                          max="600"
-                          step="10"
-                          value={filterSettings().minVideoDurationSeconds}
-                          onInput={(e) => {
-                            const value = parseInt(e.currentTarget.value) || 60;
-                            const clampedValue = Math.max(0, Math.min(value, 600));
-                            if (clampedValue !== filterSettings().minVideoDurationSeconds) {
-                              handleFilterSettingsChange("minVideoDurationSeconds", clampedValue);
-                            }
-                          }}
-                          disabled={loading()}
-                        />
-                        <p class="text-xs text-muted-foreground">
-                          Videos shorter than this duration (e.g., Shorts) are automatically filtered out.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div class="flex flex-col gap-4">
-                <Label for="favorite-video-url">
-                  <Heart class="h-4 w-4 text-primary" />
-                  Add Favorite Video
-                </Label>
-                <p class="text-xs text-muted-foreground">
-                  Paste a YouTube URL or video ID to add it to your favorites (positive) or use thumbs down on search results for negative feedback. This data trains your recommendation model.
-                </p>
-                <div class="flex flex-row gap-2">
-                  <Input
-                    id="favorite-video-url"
-                    type="text"
-                    placeholder="https://www.youtube.com/watch?v=..."
-                    class="flex-1"
-                    value={favoriteVideoUrl()}
-                    onInput={(e) => setFavoriteVideoUrl(e.currentTarget.value)}
-                    disabled={addingFavorite() || loading()}
-                    onKeyPress={(e) => {
-                      if (e.key === "Enter") {
-                        handleAddFavoriteVideo();
-                      }
-                    }}
-                  />
-                  <Button
-                    type="button"
-                    variant="default"
-                    size="default"
-                    onClick={handleAddFavoriteVideo}
-                    disabled={addingFavorite() || loading() || !favoriteVideoUrl().trim() || !youtubeApiKey().trim()}
-                    class="flex items-center gap-2"
-                  >
-                    {addingFavorite() ? (
-                      <Loader class="animate-spin" size={16} />
-                    ) : (
-                      <Plus size={16} />
-                    )}
-                    <span>Add</span>
-                  </Button>
-                </div>
-              </div>
-
-              <div class="flex flex-col gap-4">
-                <Label>
-                  <Database class="h-4 w-4 text-primary" />
-                  Video pool (fewer API calls)
-                </Label>
-                <p class="text-xs text-muted-foreground">
-                  Seed a local cache with videos from YouTube once. Searches then use the pool first and only call the API when needed. Saves quota for testing filtering and recommendations.
-                </p>
-                <div class="flex flex-wrap items-center gap-3">
-                  {poolStatus() && (() => {
-                    const ps = poolStatus()!;
-                    return (
-                      <span class="text-sm text-muted-foreground">
-                        Pool: {ps.count} video(s)
-                        {ps.updatedAt != null ? `, updated ${new Date(ps.updatedAt).toLocaleString()}` : ""}
-                      </span>
-                    );
-                  })()}
-                </div>
-                <div class="flex flex-col gap-2">
-                  <Label for="pool-seed-queries" class="text-sm">
-                    Seed with search terms (comma-separated)
-                  </Label>
-                  <Input
-                    id="pool-seed-queries"
-                    type="text"
-                    placeholder="documentary, cooking, travel"
-                    value={poolSeedQueries()}
-                    onInput={(e) => setPoolSeedQueries(e.currentTarget.value)}
-                    disabled={seedingPool() || loading()}
-                  />
-                  <div class="flex items-center gap-2">
-                    <Label for="pool-pages" class="text-sm">
-                      Pages per term:
-                    </Label>
-                    <Input
-                      id="pool-pages"
-                      type="number"
-                      min="1"
-                      max="5"
-                      value={poolPagesPerQuery()}
-                      onInput={(e) => setPoolPagesPerQuery(parseInt(e.currentTarget.value, 10) || 2)}
-                      disabled={seedingPool() || loading()}
-                      class="w-20"
-                    />
-                    <span class="text-xs text-muted-foreground">
-                      (~101 API units per page)
-                    </span>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="default"
-                    onClick={handleSeedPool}
-                    disabled={seedingPool() || loading() || !youtubeApiKey().trim()}
-                    class="flex items-center gap-2 self-start"
-                  >
-                    {seedingPool() ? (
-                      <Loader class="animate-spin" size={16} />
-                    ) : (
-                      <Database size={16} />
-                    )}
-                    <span>Seed pool</span>
-                  </Button>
-                </div>
-              </div>
-
-              <div class="flex flex-col gap-4">
-                <Label>
-                  <Sparkles class="h-4 w-4 text-primary" />
-                  Recommendation model (watch while eating)
-                </Label>
-                <p class="text-xs text-muted-foreground">
-                  Train a model on your likes and dislikes. Once trained, search results are re-ranked so videos that match your taste appear first.
-                </p>
-                <div class="flex flex-wrap items-center gap-3">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="default"
-                    onClick={handleTrainModel}
-                    disabled={
-                      trainingModel() ||
-                      (modelStatus()?.positiveCount ?? 0) < 2 ||
-                      (modelStatus()?.negativeCount ?? 0) < 2
-                    }
-                    class="flex items-center gap-2"
-                  >
-                    {trainingModel() ? (
-                      <Loader class="animate-spin" size={16} />
-                    ) : (
-                      <Sparkles size={16} />
-                    )}
-                    <span>Train model</span>
-                  </Button>
-                  {modelStatus() && (
-                    <span class="text-sm text-muted-foreground">
-                      {modelStatus()!.available
-                        ? `Trained on ${modelStatus()!.positiveCount} likes, ${modelStatus()!.negativeCount} dislikes. Results are ranked by your preferences.`
-                        : `Add at least 2 likes and 2 dislikes to train (you have ${modelStatus()!.positiveCount} likes, ${modelStatus()!.negativeCount} dislikes).`}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <div class="flex flex-col gap-4">
-                <Label
-                  for="search-query"
-                >
-                  <Search class="h-4 w-4 text-primary" />
-                  Enter keyword or topic to search for
-                </Label>
-
-                <div class="flex flex-row gap-4">
-                  <Input
-                    id="search-query"
-                    type="text"
-                    placeholder="Search for YouTube content..."
-                    class="w-full"
-                    value={searchQuery()}
-                    onInput={(e) => setSearchQuery(e.currentTarget.value)}
-                    onKeyPress={handleKeyPress}
-                    disabled={loading() || !youtubeApiKey().trim()}
-                  />
-
-                  <Button
-                    size="lg"
-                    onClick={handleSearch}
-                    disabled={loading() || !youtubeApiKey().trim()}
-                  >
-                    {loading() ? (
-                      <>
-                        <Loader class="animate-spin" />
-                      </>
-                    ) : (
-                      <>
-                        Search
-                      </>
-                    )}
-                  </Button>
-                </div>
-
-                {error() && (
-                  <div class="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
-                    {error()}
-                  </div>
-                )}
-              </div>
-
-
-            </CardContent>
-          </Card>
-
-          {videos().length > 0 && (
-            <div class="flex flex-col gap-6">
-              <h2 class="text-2xl font-semibold">
-                Found {videos().length} {videos().length === 1 ? "video" : "videos"}
-              </h2>
-              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {videos().map((video) => (
+          {isLoading() && displayVideos().length === 0 ? (
+            <div class="flex items-center justify-center py-16">
+              <Loader class="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : displayVideos().length > 0 ? (
+            <div class="flex flex-col gap-4">
+              <Text variant="headline">
+                {viewMode() === "feed" ? "Recommendations" : `Search: ${searchQuery() || "..."}`}
+              </Text>
+              <div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                {displayVideos().map((video) => (
                   <VideoCard video={video} onFeedbackChange={refreshModelStatus} />
                 ))}
               </div>
             </div>
+          ) : (
+            <EmptyState
+              title="No recommendations yet."
+              description="Seed the pool in Settings (add an API key to fetch from YouTube)."
+              action={
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowSettings(true)}
+                  class="gap-2"
+                >
+                  <Settings size={16} />
+                  Open Settings
+                </Button>
+              }
+            />
           )}
+
+          <Dialog open={showSettings()} onOpenChange={setShowSettings}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Settings</DialogTitle>
+                <DialogDescription>
+                  Configure your API key, content filters, and recommendations.
+                </DialogDescription>
+              </DialogHeader>
+
+              <DialogBody>
+                {/* -- Section: YouTube API Key -- */}
+                <SettingsSection class="pt-0 pb-1">YouTube API Key</SettingsSection>
+                <SettingsGroup>
+                  <SettingsRow label="API Key">
+                    <div class="flex items-center gap-2 min-w-0">
+                      <Input
+                        id="youtube-api-key"
+                        type={showYoutubeApiKey() ? "text" : "password"}
+                        placeholder="Paste key here..."
+                        class="h-8 text-sm text-right bg-transparent border-0 shadow-none focus:ring-0 min-w-0"
+                        value={youtubeApiKey()}
+                        onInput={(e) => handleYoutubeApiKeyChange(e.currentTarget.value)}
+                        disabled={searchLoading()}
+                      />
+                      <Button type="button" variant="ghost" size="icon" class="h-7 w-7 shrink-0" onClick={() => setShowYoutubeApiKey(!showYoutubeApiKey())} title={showYoutubeApiKey() ? "Hide" : "Show"}>
+                        {showYoutubeApiKey() ? <EyeOff class="h-3.5 w-3.5 text-muted-foreground" /> : <Eye class="h-3.5 w-3.5 text-muted-foreground" />}
+                      </Button>
+                    </div>
+                  </SettingsRow>
+                  <div class="flex items-center justify-between px-4 py-2.5">
+                    <p class="text-xs text-muted-foreground">
+                      <a href="https://console.cloud.google.com/marketplace/product/google/youtube.googleapis.com" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">Enable the YouTube Data API</a>, then create a key in{" "}
+                      <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">Credentials</a>. Stored encrypted in your browser.
+                    </p>
+                    <div class="flex items-center gap-2 shrink-0 ml-3">
+                      {youtubeApiKey() && (
+                        <Button type="button" variant="ghost" size="xs" onClick={handleClearYoutubeApiKey} disabled={searchLoading()} class="text-destructive h-7">Clear</Button>
+                      )}
+                      <Button type="button" variant="default" size="xs" onClick={handleSaveYoutubeApiKey} disabled={searchLoading() || !youtubeApiKey().trim()} class="h-7">Save</Button>
+                    </div>
+                  </div>
+                </SettingsGroup>
+
+                {/* -- Section: Content Filtering -- */}
+                <SettingsSection class="pb-1">Content Filtering</SettingsSection>
+                <SettingsGroup>
+                  <SettingsRow label="AI-powered filtering" description="Analyzes titles and engagement for authentic content">
+                    <Checkbox
+                      id="use-custom-filtering"
+                      checked={useCustomFiltering()}
+                      onChange={(e) => handleCustomFilteringToggle(e.currentTarget.checked)}
+                      disabled={searchLoading()}
+                    />
+                  </SettingsRow>
+                  <SettingsRow label="Authenticity threshold">
+                    <div class="flex items-center gap-3 w-40">
+                      <Input
+                        id="authenticity-threshold"
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        value={filterSettings().authenticityThreshold}
+                        onInput={(e) => {
+                          const value = parseFloat(e.currentTarget.value);
+                          handleFilterSettingsChange("authenticityThreshold", value);
+                          e.currentTarget.style.setProperty("--fill-percentage", `${value * 100}%`);
+                        }}
+                        disabled={searchLoading()}
+                        class="slider-with-fill flex-1"
+                        style={`--fill-percentage: ${filterSettings().authenticityThreshold * 100}%`}
+                      />
+                      <span class="text-xs tabular-nums text-muted-foreground w-8 text-right">{filterSettings().authenticityThreshold.toFixed(2)}</span>
+                    </div>
+                  </SettingsRow>
+                  <SettingsRow label="Max pages to search" description="Used when searching YouTube">
+                    <Input id="max-pages" type="number" min="1" max="95" value={filterSettings().maxPagesToSearch} onInput={(e) => { const v = parseInt(e.currentTarget.value, 10) || 20; handleFilterSettingsChange("maxPagesToSearch", Math.max(1, Math.min(v, 95))); }} disabled={searchLoading()} class="h-8 w-20 text-sm text-right" />
+                  </SettingsRow>
+                  <SettingsRow label="Max videos to fetch" description="Used when searching YouTube">
+                    <Input id="max-total-videos" type="number" min="50" max="4750" step="50" value={filterSettings().maxTotalVideosToFetch} onInput={(e) => { const v = parseInt(e.currentTarget.value, 10) || 1000; handleFilterSettingsChange("maxTotalVideosToFetch", Math.max(50, Math.min(v, 4750))); }} disabled={searchLoading()} class="h-8 w-20 text-sm text-right" />
+                  </SettingsRow>
+                  <SettingsRow label="Min duration (seconds)" description="Filters out Shorts" border={false}>
+                    <Input id="min-duration" type="number" min="0" max="600" step="10" value={filterSettings().minVideoDurationSeconds} onInput={(e) => { const v = parseInt(e.currentTarget.value, 10) || 60; handleFilterSettingsChange("minVideoDurationSeconds", Math.max(0, Math.min(v, 600))); }} disabled={searchLoading()} class="h-8 w-20 text-sm text-right" />
+                  </SettingsRow>
+                </SettingsGroup>
+
+                {/* -- Section: Training Data -- */}
+                <SettingsSection class="pb-1">Training Data</SettingsSection>
+                <SettingsGroup>
+                  <SettingsContentRow label="Add favorite video" description="Requires API key. Trains your recommendation model.">
+                    <div class="flex items-center gap-2">
+                      <Input
+                        id="favorite-video-url"
+                        type="text"
+                        placeholder="https://youtube.com/watch?v=..."
+                        class="h-8 text-sm flex-1"
+                        value={favoriteVideoUrl()}
+                        onInput={(e) => setFavoriteVideoUrl(e.currentTarget.value)}
+                        disabled={addingFavorite() || searchLoading()}
+                        onKeyPress={(e) => { if (e.key === "Enter") handleAddFavoriteVideo(); }}
+                      />
+                      <Button type="button" size="xs" onClick={handleAddFavoriteVideo} disabled={addingFavorite() || searchLoading() || !favoriteVideoUrl().trim() || !youtubeApiKey().trim()} class="h-8 gap-1.5">
+                        {addingFavorite() ? <Loader class="animate-spin" size={14} /> : <Plus size={14} />}
+                        Add
+                      </Button>
+                    </div>
+                  </SettingsContentRow>
+                  <SettingsRow
+                    label="Recommendation model"
+                    description={modelStatus()
+                      ? modelStatus()!.available
+                        ? `Trained: ${modelStatus()!.positiveCount} likes, ${modelStatus()!.negativeCount} dislikes`
+                        : `${modelStatus()!.positiveCount} likes, ${modelStatus()!.negativeCount} dislikes (need 2 each)`
+                      : undefined}
+                    border={false}
+                  >
+                    <Button type="button" variant="outline" size="xs" onClick={handleTrainModel} disabled={trainingModel() || (modelStatus()?.positiveCount ?? 0) < 2 || (modelStatus()?.negativeCount ?? 0) < 2} class="h-8 gap-1.5 shrink-0">
+                      {trainingModel() ? <Loader class="animate-spin" size={14} /> : <Sparkles size={14} />}
+                      Train
+                    </Button>
+                  </SettingsRow>
+                </SettingsGroup>
+
+                {/* -- Section: Video Pool -- */}
+                <SettingsSection class="pb-1">Video Pool</SettingsSection>
+                <SettingsGroup>
+                  {poolStatus() && (
+                    <SettingsRow label="Pool size">
+                      <span class="text-sm text-muted-foreground tabular-nums">
+                        {poolStatus()!.count} video{poolStatus()!.count !== 1 ? "s" : ""}
+                        {poolStatus()!.updatedAt != null ? ` -- ${new Date(poolStatus()!.updatedAt!).toLocaleDateString()}` : ""}
+                      </span>
+                    </SettingsRow>
+                  )}
+                  <SettingsContentRow label="Search terms (comma-separated)">
+                    <Input
+                      id="pool-seed-queries"
+                      type="text"
+                      placeholder="documentary, cooking, travel"
+                      class="h-8 text-sm"
+                      value={poolSeedQueries()}
+                      onInput={(e) => setPoolSeedQueries(e.currentTarget.value)}
+                      disabled={seedingPool() || searchLoading()}
+                    />
+                  </SettingsContentRow>
+                  <SettingsRow label="Pages per term" border={false}>
+                    <div class="flex items-center gap-3">
+                      <Input id="pool-pages" type="number" min="1" max="5" value={poolPagesPerQuery()} onInput={(e) => setPoolPagesPerQuery(parseInt(e.currentTarget.value, 10) || 2)} disabled={seedingPool() || searchLoading()} class="h-8 w-16 text-sm text-right" />
+                      <Button type="button" variant="default" size="xs" onClick={handleSeedPool} disabled={seedingPool() || searchLoading() || !youtubeApiKey().trim()} class="h-8 gap-1.5 shrink-0">
+                        {seedingPool() ? <Loader class="animate-spin" size={14} /> : <Database size={14} />}
+                        Seed pool
+                      </Button>
+                    </div>
+                  </SettingsRow>
+                </SettingsGroup>
+
+              </DialogBody>
+
+              <DialogFooter>
+                <Button type="button" variant="default" size="default" onClick={() => setShowSettings(false)}>
+                  Done
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
-      </main>
+      </main >
     </>
   );
 }

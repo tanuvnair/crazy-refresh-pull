@@ -120,8 +120,8 @@
   }
 
   input[type="checkbox"]:checked {
-    background-color: hsl(217 91% 60%) !important;
-    border-color: hsl(217 91% 60%) !important;
+    background-color: hsl(var(--primary)) !important;
+    border-color: hsl(var(--primary)) !important;
   }
 
   /* Range input slider - Custom CSS required (Tailwind doesn't support pseudo-elements like ::-webkit-slider-track) */
@@ -210,5 +210,42 @@
   input[type="range"]:disabled::-webkit-slider-thumb,
   input[type="range"]:disabled::-moz-range-thumb {
     @apply cursor-not-allowed;
+  }
+
+  /* Dialog animations (shadcn-style: data-state open/closed) */
+  @keyframes dialog-overlay-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes dialog-overlay-out {
+    from { opacity: 1; }
+    to { opacity: 0; }
+  }
+  @keyframes dialog-content-in {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  @keyframes dialog-content-out {
+    from { opacity: 1; transform: scale(1); }
+    to { opacity: 0; transform: scale(0.95); }
+  }
+  .dialog-overlay[data-state="closed"] {
+    opacity: 0;
+  }
+  .dialog-overlay[data-state="open"] {
+    animation: dialog-overlay-in 0.2s ease-out forwards;
+  }
+  .dialog-overlay[data-state="closed"][data-exiting="true"] {
+    animation: dialog-overlay-out 0.2s ease-out forwards;
+  }
+  .dialog-content[data-state="closed"] {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  .dialog-content[data-state="open"] {
+    animation: dialog-content-in 0.2s ease-out forwards;
+  }
+  .dialog-content[data-state="closed"][data-exiting="true"] {
+    animation: dialog-content-out 0.2s ease-out forwards;
   }
 }

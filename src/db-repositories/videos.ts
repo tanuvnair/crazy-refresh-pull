@@ -109,7 +109,8 @@ export async function count(): Promise<number> {
  */
 export async function lastUpdatedAt(): Promise<string | null> {
   await ensureSchema();
-  const rows = await sql`SELECT created_at FROM videos ORDER BY created_at DESC LIMIT 1`;
+  const rows =
+    await sql`SELECT created_at FROM videos ORDER BY created_at DESC LIMIT 1`;
   if (rows.length === 0) return null;
   return rows[0].created_at as string;
 }
@@ -128,14 +129,43 @@ export async function findAll(): Promise<VideoRow[]> {
  */
 export async function findNewest(limit: number): Promise<VideoRow[]> {
   await ensureSchema();
-  const rows = await sql`SELECT * FROM videos ORDER BY created_at DESC LIMIT ${limit}`;
+  const rows =
+    await sql`SELECT * FROM videos ORDER BY created_at DESC LIMIT ${limit}`;
+  return rows as VideoRow[];
+}
+
+/**
+ * Get random videos from the pool for the feed. Optionally exclude given IDs.
+ */
+export async function findRandom(
+  limit: number,
+  excludeIds?: string[],
+): Promise<VideoRow[]> {
+  await ensureSchema();
+  if (excludeIds && excludeIds.length > 0) {
+    const rows = await sql`
+      SELECT * FROM videos
+      WHERE NOT (id = ANY(${excludeIds}))
+      ORDER BY RANDOM()
+      LIMIT ${limit}
+    `;
+    return rows as VideoRow[];
+  }
+  const rows = await sql`
+    SELECT * FROM videos
+    ORDER BY RANDOM()
+    LIMIT ${limit}
+  `;
   return rows as VideoRow[];
 }
 
 /**
  * Search by terms using ILIKE. Returns up to `limit` rows matching any term in title or description.
  */
-export async function searchByTerms(terms: string[], limit: number): Promise<VideoRow[]> {
+export async function searchByTerms(
+  terms: string[],
+  limit: number,
+): Promise<VideoRow[]> {
   if (terms.length === 0) {
     return findNewest(limit);
   }

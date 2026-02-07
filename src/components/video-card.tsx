@@ -1,6 +1,5 @@
 import { Component, JSX, createSignal, onMount } from "solid-js";
-import { Card, CardContent } from "~/components/ui";
-import { Button } from "~/components/ui";
+import { Badge, Button, Card, CardContent } from "~/components/ui";
 import { ExternalLink, ThumbsUp, ThumbsDown } from "lucide-solid";
 
 export interface Video {
@@ -41,12 +40,12 @@ const VideoCard: Component<VideoCardProps> = (props) => {
   const handleFeedback = async (action: "like" | "dislike", event: MouseEvent) => {
     event.preventDefault();
     event.stopPropagation();
-    
+
     if (isSubmitting()) return;
 
     // If clicking the same button, remove feedback
-    const newAction = feedbackStatus() === (action === "like" ? "positive" : "negative") 
-      ? "remove" 
+    const newAction = feedbackStatus() === (action === "like" ? "positive" : "negative")
+      ? "remove"
       : action;
 
     setIsSubmitting(true);
@@ -106,13 +105,9 @@ const VideoCard: Component<VideoCardProps> = (props) => {
     });
   };
 
-  const truncateText = (text: string, maxLength: number): string => {
-    if (text.length <= maxLength) return text;
-    return text.substring(0, maxLength) + "...";
-  };
 
   return (
-    <Card class="overflow-hidden hover:shadow-lg transition-shadow">
+    <Card class="overflow-hidden transition-shadow hover:shadow-apple-lg">
       <a
         href={props.video.url}
         target="_blank"
@@ -126,20 +121,17 @@ const VideoCard: Component<VideoCardProps> = (props) => {
             class="w-full h-full object-cover"
             loading="lazy"
           />
-          <div class="absolute top-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded flex items-center gap-1">
+          <Badge variant="default" class="absolute top-2 right-2 gap-1 bg-black/70 text-white">
             <ExternalLink size={12} />
             <span>Watch</span>
-          </div>
+          </Badge>
         </div>
 
         <CardContent class="p-4">
-          <h3 class="font-semibold text-lg mb-2 line-clamp-2 min-h-14">
+          <h3 class="text-lg font-semibold leading-7 line-clamp-2 min-h-14">
             {props.video.title}
           </h3>
-          <p class="text-sm text-muted-foreground mb-3 line-clamp-2">
-            {truncateText(props.video.description, 120)}
-          </p>
-          <div class="flex flex-col gap-2">
+          <div class="flex flex-col gap-2 mt-2">
             <div class="flex items-center justify-between text-xs text-muted-foreground">
               <span>{props.video.channelTitle}</span>
               <span>{formatDate(props.video.publishedAt)}</span>
@@ -153,18 +145,18 @@ const VideoCard: Component<VideoCardProps> = (props) => {
           </div>
         </CardContent>
       </a>
-      
-      <div class="px-4 pb-4 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+
+      <div class="flex items-center gap-2 px-4 pb-4" onClick={(e) => e.stopPropagation()}>
         <Button
           type="button"
           variant={feedbackStatus() === "positive" ? "default" : "outline"}
           size="sm"
           onClick={(e) => handleFeedback("like", e)}
           disabled={isSubmitting()}
-          class="flex-1"
+          class="flex-1 gap-1.5"
         >
           <ThumbsUp size={16} class={feedbackStatus() === "positive" ? "fill-current" : ""} />
-          <span class="ml-1">Like</span>
+          Like
         </Button>
         <Button
           type="button"
@@ -172,10 +164,10 @@ const VideoCard: Component<VideoCardProps> = (props) => {
           size="sm"
           onClick={(e) => handleFeedback("dislike", e)}
           disabled={isSubmitting()}
-          class="flex-1"
+          class="flex-1 gap-1.5"
         >
           <ThumbsDown size={16} class={feedbackStatus() === "negative" ? "fill-current" : ""} />
-          <span class="ml-1">Dislike</span>
+          Dislike
         </Button>
       </div>
     </Card>

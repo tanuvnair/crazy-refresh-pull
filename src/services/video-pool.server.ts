@@ -1,6 +1,7 @@
 import * as videosRepo from "~/db-repositories/videos";
 import type { VideoRow } from "~/db-repositories/videos";
 import type { Video } from "~/components/video-card";
+import { applyFiltersAndRank } from "./apply-filters-rank.server";
 
 export interface VideoPoolData {
   updatedAt: string;
@@ -21,7 +22,17 @@ function rowToVideo(row: VideoRow): Video {
   };
 }
 
-function videoToInsert(v: Video): { id: string; title: string; description?: string | null; thumbnail?: string | null; channelTitle?: string | null; publishedAt?: string | null; viewCount?: string | null; likeCount?: string | null; url: string } {
+function videoToInsert(v: Video): {
+  id: string;
+  title: string;
+  description?: string | null;
+  thumbnail?: string | null;
+  channelTitle?: string | null;
+  publishedAt?: string | null;
+  viewCount?: string | null;
+  likeCount?: string | null;
+  url: string;
+} {
   return {
     id: v.id,
     title: v.title ?? "",
@@ -50,7 +61,9 @@ export async function readPool(): Promise<VideoPoolData> {
 /**
  * Merge new videos into the pool by id. Enforces MAX_POOL_SIZE by evicting the oldest rows.
  */
-export async function addToPool(newVideos: Video[]): Promise<{ added: number; total: number }> {
+export async function addToPool(
+  newVideos: Video[],
+): Promise<{ added: number; total: number }> {
   const inserts = newVideos.filter((v) => v.id).map(videoToInsert);
   const added = await videosRepo.insertMany(inserts);
   await videosRepo.evictOldest();
@@ -62,7 +75,11 @@ export async function addToPool(newVideos: Video[]): Promise<{ added: number; to
  * Search pool by query. Returns up to limit results ranked by relevance.
  * The first parameter is accepted for backward compatibility but ignored; data comes from the database.
  */
-export async function searchPool(_pool: VideoPoolData | null, query: string, limit: number): Promise<Video[]> {
+export async function searchPool(
+  _pool: VideoPoolData | null,
+  query: string,
+  limit: number,
+): Promise<Video[]> {
   const q = query.trim().toLowerCase();
   const terms = q.split(/\s+/).filter((t) => t.length >= 2);
   const rows = await videosRepo.searchByTerms(terms, limit);
@@ -86,10 +103,40 @@ export async function searchPool(_pool: VideoPoolData | null, query: string, lim
   return scored.map((s) => rowToVideo(s.row));
 }
 
+export interface GetRandomRecommendationsOptions {
+  useCustomFiltering?: boolean;
+  authenticityThreshold?: number;
+}
+
+/**
+ * Get random recommendations from the pool, filtered and ranked like search results.
+ * Fetches more candidates than needed to account for filtering.
+ */
+export async function getRandomRecommendations(
+  limit: number,
+  options?: GetRandomRecommendationsOptions,
+): Promise<Video[]> {
+  const useCustomFiltering = options?.useCustomFiltering ?? true;
+  const authenticityThreshold = options?.authenticityThreshold ?? 0.4;
+  const candidateLimit = Math.min(limit * 3, 300);
+  const rows = await videosRepo.findRandom(candidateLimit);
+  const candidates = rows.map(rowToVideo);
+  if (candidates.length === 0) return [];
+  return applyFiltersAndRank(
+    candidates,
+    limit,
+    useCustomFiltering,
+    authenticityThreshold,
+  );
+}
+
 /**
  * Get pool status for UI.
  */
-export async function getPoolStatus(): Promise<{ count: number; updatedAt: string | null }> {
+export async function getPoolStatus(): Promise<{
+  count: number;
+  updatedAt: string | null;
+}> {
   const cnt = await videosRepo.count();
   if (cnt === 0) {
     return { count: 0, updatedAt: null };

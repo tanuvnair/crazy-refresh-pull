@@ -1,8 +1,7 @@
 import { Title } from "@solidjs/meta";
 import { HttpStatusCode } from "@solidjs/start";
 import { A } from "@solidjs/router";
-import { Card, CardHeader, CardTitle, CardDescription, CardFooter, CardContent } from "~/components/ui";
-import { Button } from "~/components/ui";
+import { Button, Card, CardHeader, CardTitle, CardFooter, Text } from "~/components/ui";
 
 export default function NotFound() {
   return (
@@ -11,16 +10,18 @@ export default function NotFound() {
       <HttpStatusCode code={404} />
 
       <main class="flex min-h-screen items-center justify-center px-4">
-        <Card>
+        <Card class="max-w-sm w-full">
           <CardHeader class="gap-2 text-center">
             <CardTitle>Page Not Found</CardTitle>
-            <CardDescription>
-              The page you're looking for doesn't exist
-            </CardDescription>
+            <Text variant="subheadline" muted>
+              The page you're looking for doesn't exist.
+            </Text>
           </CardHeader>
 
           <CardFooter class="justify-center gap-2">
-            <Button variant="outline">Refresh Page</Button>
+            <Button variant="outline" onClick={() => window.location.reload()}>
+              Refresh Page
+            </Button>
             <A href="/">
               <Button>Go Back Home</Button>
             </A>
