@@ -15,7 +15,13 @@ import {
   SettingsRow,
   SettingsContentRow,
 } from "~/components/ui";
-import { Check, Eye, EyeOff, Loader, Plus, Sparkles, Database } from "lucide-solid";
+import Check from "lucide-solid/icons/check";
+import Eye from "lucide-solid/icons/eye";
+import EyeOff from "lucide-solid/icons/eye-off";
+import Loader from "lucide-solid/icons/loader";
+import Plus from "lucide-solid/icons/plus";
+import Sparkles from "lucide-solid/icons/sparkles";
+import Database from "lucide-solid/icons/database";
 
 export interface FilterSettingsShape {
   maxPagesToSearch: number;

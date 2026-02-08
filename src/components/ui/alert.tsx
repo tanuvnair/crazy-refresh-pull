@@ -1,6 +1,8 @@
 import { children, Component, JSX, splitProps } from "solid-js";
 import { cn } from "~/lib/utils";
-import { Info, AlertTriangle, AlertCircle } from "lucide-solid";
+import Info from "lucide-solid/icons/info";
+import AlertTriangle from "lucide-solid/icons/alert-triangle";
+import AlertCircle from "lucide-solid/icons/circle-alert";
 
 export interface AlertProps extends JSX.HTMLAttributes<HTMLDivElement> {
   variant?: "default" | "warning" | "destructive";

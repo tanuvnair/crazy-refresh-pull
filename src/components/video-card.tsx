@@ -1,6 +1,8 @@
 import { Component, createSignal, onMount } from "solid-js";
 import { Badge, Button, Card, CardContent } from "~/components/ui";
-import { ExternalLink, ThumbsUp, ThumbsDown } from "lucide-solid";
+import ExternalLink from "lucide-solid/icons/external-link";
+import ThumbsUp from "lucide-solid/icons/thumbs-up";
+import ThumbsDown from "lucide-solid/icons/thumbs-down";
 import { decodeHtmlEntities } from "~/lib/html-entities";
 import { log } from "~/lib/logger";
 

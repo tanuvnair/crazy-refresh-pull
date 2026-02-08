@@ -1,7 +1,11 @@
 import { Title } from "@solidjs/meta";
 import { createSignal, onMount } from "solid-js";
 import { Alert, Button, EmptyState, Input, Text } from "~/components/ui";
-import { Search, Settings, RefreshCw, ArrowLeft, Loader } from "lucide-solid";
+import Search from "lucide-solid/icons/search";
+import Settings from "lucide-solid/icons/settings";
+import RefreshCw from "lucide-solid/icons/refresh-cw";
+import ArrowLeft from "lucide-solid/icons/arrow-left";
+import Loader from "lucide-solid/icons/loader";
 import VideoCard, { type Video } from "~/components/video-card";
 import SettingsDialog from "~/components/settings-dialog";
 import { encryptApiKey, decryptApiKey } from "~/lib/encryption";

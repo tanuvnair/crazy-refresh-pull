@@ -2,7 +2,8 @@ import { Title } from "@solidjs/meta";
 import { HttpStatusCode } from "@solidjs/start";
 import { A } from "@solidjs/router";
 import { Button, Card, CardHeader, CardTitle, CardFooter, Text } from "~/components/ui";
-import { ArrowLeft, RefreshCw } from "lucide-solid";
+import ArrowLeft from "lucide-solid/icons/arrow-left";
+import RefreshCw from "lucide-solid/icons/refresh-cw";
 
 export default function NotFound() {
   return (

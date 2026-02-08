@@ -74,8 +74,8 @@ export async function insertMany(videos: VideoInsert[]): Promise<number> {
  */
 export async function evictOldest(): Promise<void> {
   await prisma.$executeRaw`
-    DELETE FROM videos WHERE id NOT IN (
-      SELECT id FROM videos ORDER BY created_at DESC LIMIT ${MAX_POOL_SIZE}
+    DELETE FROM "Video" WHERE id NOT IN (
+      SELECT id FROM "Video" ORDER BY "createdAt" DESC LIMIT ${MAX_POOL_SIZE}
     )
   `;
 }
@@ -88,7 +88,7 @@ export async function count(): Promise<number> {
 }
 
 /**
- * Get the most recent created_at value, or null if empty.
+ * Get the most recent createdAt value, or null if empty.
  */
 export async function lastUpdatedAt(): Promise<string | null> {
   const row = await prisma.video.findFirst({
@@ -118,9 +118,9 @@ export async function findNewest(limit: number): Promise<VideoRow[]> {
   });
 }
 
-/** Column aliases to map snake_case DB columns to camelCase Prisma field names. */
-const VIDEO_COLUMNS_ALIASED = Prisma.raw(
-  `id, title, description, thumbnail, channel_title AS "channelTitle", published_at AS "publishedAt", view_count AS "viewCount", like_count AS "likeCount", url, created_at AS "createdAt"`
+/** All video columns for raw queries. */
+const VIDEO_COLUMNS = Prisma.raw(
+  `id, title, description, thumbnail, "channelTitle", "publishedAt", "viewCount", "likeCount", url, "createdAt"`
 );
 
 /**
@@ -132,14 +132,14 @@ export async function findRandom(
 ): Promise<VideoRow[]> {
   if (excludeIds && excludeIds.length > 0) {
     return prisma.$queryRaw<VideoRow[]>`
-      SELECT ${VIDEO_COLUMNS_ALIASED} FROM videos
+      SELECT ${VIDEO_COLUMNS} FROM "Video"
       WHERE NOT (id = ANY(${excludeIds}))
       ORDER BY RANDOM()
       LIMIT ${limit}
     `;
   }
   return prisma.$queryRaw<VideoRow[]>`
-    SELECT ${VIDEO_COLUMNS_ALIASED} FROM videos
+    SELECT ${VIDEO_COLUMNS} FROM "Video"
     ORDER BY RANDOM()
     LIMIT ${limit}
   `;
