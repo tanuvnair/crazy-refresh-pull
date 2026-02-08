@@ -20,20 +20,22 @@ A personalized YouTube discovery app that surfaces long-form videos. You seed a 
 - **Model:** `POST /api/train-model` -> `recommendation-model.server` trains logistic regression on positive/negative feedback; model stored in DB `model`. Used in `applyFiltersAndRank` to rank feed and search results.
 
 ```mermaid
-flowchart LR
+flowchart TB
   subgraph client [Client]
     Home[index.tsx]
-    Settings[SettingsDialog]
     VideoCard[VideoCard]
+    Settings[SettingsDialog]
   end
+
   subgraph api [API Routes]
     feed["/api/feed"]
     youtube["/api/youtube"]
-    pool["/api/pool"]
     feedback["/api/feedback"]
+    pool["/api/pool"]
     addVideo["/api/add-video"]
     train["/api/train-model"]
   end
+
   subgraph services [Services]
     videoPool[video-pool.server]
     yt[youtube.server]
@@ -41,34 +43,37 @@ flowchart LR
     feedbackSvc[feedback.server]
     modelSvc[recommendation-model.server]
   end
+
   subgraph db [PostgreSQL]
     videos[(videos)]
     feedbackTable[(feedback)]
     modelTable[(model)]
   end
+
   Home --> feed
   Home --> youtube
-  Home --> Settings
+  VideoCard --> feedback
   Settings --> pool
   Settings --> addVideo
   Settings --> train
-  VideoCard --> feedback
+
   feed --> videoPool
   feed --> applyRank
   youtube --> yt
-  yt --> videoPool
-  yt --> applyRank
   pool --> yt
   pool --> videoPool
   addVideo --> yt
   addVideo --> feedbackSvc
   feedback --> feedbackSvc
   train --> modelSvc
+
+  yt --> videoPool
+  yt --> applyRank
   videoPool --> videos
+  applyRank --> feedbackSvc
+  applyRank --> modelSvc
   feedbackSvc --> feedbackTable
   modelSvc --> modelTable
-  applyRank --> modelSvc
-  applyRank --> feedbackSvc
 ```
 
 ## Key concepts
