@@ -6,6 +6,7 @@ import VideoCard, { type Video } from "~/components/video-card";
 import SettingsDialog from "~/components/settings-dialog";
 import { encryptApiKey, decryptApiKey } from "~/lib/encryption";
 import { getYouTubeApiKeyFromCookie, saveYouTubeApiKeyToCookie } from "~/lib/cookie";
+import { log } from "~/lib/logger";
 
 const YOUTUBE_API_KEY_STORAGE_KEY = "youtube_api_key_encrypted";
 const FILTER_SETTINGS_KEY = "filter_settings";
@@ -122,11 +123,15 @@ export default function Home() {
           setFilterSettings(clampedSettings);
           sessionStorage.setItem(FILTER_SETTINGS_KEY, JSON.stringify(clampedSettings));
         } catch (err) {
-          console.error("Failed to parse filter settings:", err);
+          log.error("index: failed to parse filter settings", {
+            message: err instanceof Error ? err.message : String(err),
+          });
         }
       }
     } catch (err) {
-      console.error("Failed to load API keys from storage:", err);
+      log.error("index: failed to load API keys from storage", {
+        message: err instanceof Error ? err.message : String(err),
+      });
     }
 
     loadFeed();
@@ -179,7 +184,9 @@ export default function Home() {
         saveYouTubeApiKeyToCookie("");
       }
     } catch (err) {
-      console.error("Failed to save YouTube API key to storage:", err);
+      log.error("index: failed to save YouTube API key to storage", {
+        message: err instanceof Error ? err.message : String(err),
+      });
     }
   };
 
@@ -190,7 +197,9 @@ export default function Home() {
     try {
       sessionStorage.setItem(FILTER_SETTINGS_KEY, JSON.stringify(newSettings));
     } catch (err) {
-      console.error("Failed to save filter settings:", err);
+      log.error("index: failed to save filter settings", {
+        message: err instanceof Error ? err.message : String(err),
+      });
     }
   };
 
@@ -201,7 +210,9 @@ export default function Home() {
       sessionStorage.removeItem(YOUTUBE_API_KEY_STORAGE_KEY);
       saveYouTubeApiKeyToCookie("");
     } catch (err) {
-      console.error("Failed to clear YouTube API key:", err);
+      log.error("index: failed to clear YouTube API key", {
+        message: err instanceof Error ? err.message : String(err),
+      });
     }
   };
 

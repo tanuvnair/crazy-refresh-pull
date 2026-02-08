@@ -3,6 +3,7 @@ import {
   getPositiveFeedbackWithMetadata,
   getNegativeFeedbackWithMetadata,
 } from "./feedback.server";
+import { log } from "~/lib/logger";
 
 /** Video-like type for feature extraction (Video or VideoMetadata). */
 export interface VideoLike {
@@ -317,6 +318,10 @@ export async function trainModel(): Promise<{
   };
 
   await saveModel(modelData);
+  log.info("recommendation-model: trained", {
+    positiveCount: positiveList.length,
+    negativeCount: negativeList.length,
+  });
 
   return {
     success: true,

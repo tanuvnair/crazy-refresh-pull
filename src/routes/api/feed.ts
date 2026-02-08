@@ -1,4 +1,5 @@
 import { APIEvent } from "@solidjs/start/server";
+import { log } from "~/lib/logger";
 import { getRandomRecommendations } from "~/services/video-pool.server";
 
 /**
@@ -27,12 +28,14 @@ export async function GET(event: APIEvent) {
       body.empty = true;
     }
 
+    log.info("feed: served", { count: videos.length, poolOnly: body.poolOnly });
     return new Response(JSON.stringify(body), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
+    log.error("feed: failed", { message });
     return new Response(
       JSON.stringify({ error: "Failed to load feed", message }),
       { status: 500, headers: { "Content-Type": "application/json" } },

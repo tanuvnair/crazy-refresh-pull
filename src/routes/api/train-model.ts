@@ -1,4 +1,5 @@
 import { APIEvent } from "@solidjs/start/server";
+import { log } from "~/lib/logger";
 import {
   trainModel,
   loadModel,
@@ -16,12 +17,25 @@ import {
 export async function POST(_event: APIEvent) {
   try {
     const result = await trainModel();
+    if (result.success) {
+      log.info("train-model POST: trained", {
+        positiveCount: result.positiveCount,
+        negativeCount: result.negativeCount,
+      });
+    } else {
+      log.warn("train-model POST: insufficient data", {
+        message: result.message,
+        positiveCount: result.positiveCount,
+        negativeCount: result.negativeCount,
+      });
+    }
     return new Response(JSON.stringify(result), {
       status: result.success ? 200 : 400,
       headers: { "Content-Type": "application/json" },
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
+    log.error("train-model POST: failed", { message });
     return new Response(
       JSON.stringify({
         success: false,
@@ -59,6 +73,7 @@ export async function GET(_event: APIEvent) {
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
+    log.error("train-model GET: failed", { message });
     return new Response(
       JSON.stringify({
         error: "Failed to get model status",

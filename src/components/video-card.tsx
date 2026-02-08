@@ -1,7 +1,8 @@
-import { Component, JSX, createSignal, onMount } from "solid-js";
+import { Component, createSignal, onMount } from "solid-js";
 import { Badge, Button, Card, CardContent } from "~/components/ui";
 import { ExternalLink, ThumbsUp, ThumbsDown } from "lucide-solid";
 import { decodeHtmlEntities } from "~/lib/html-entities";
+import { log } from "~/lib/logger";
 
 export interface Video {
   id: string;
@@ -34,7 +35,10 @@ const VideoCard: Component<VideoCardProps> = (props) => {
         setFeedbackStatus(data.status);
       }
     } catch (error) {
-      console.error("Failed to load feedback status:", error);
+      log.error("video-card: failed to load feedback status", {
+        videoId: props.video.id,
+        message: error instanceof Error ? error.message : String(error),
+      });
     }
   });
 
@@ -74,12 +78,25 @@ const VideoCard: Component<VideoCardProps> = (props) => {
       if (response.ok) {
         const data = await response.json();
         setFeedbackStatus(data.status);
+        log.info("video-card: feedback updated", {
+          videoId: props.video.id,
+          action: newAction,
+          status: data.status,
+        });
         props.onFeedbackChange?.();
       } else {
-        console.error("Failed to update feedback");
+        log.error("video-card: failed to update feedback", {
+          videoId: props.video.id,
+          action: newAction,
+          status: response.status,
+        });
       }
     } catch (error) {
-      console.error("Error updating feedback:", error);
+      log.error("video-card: error updating feedback", {
+        videoId: props.video.id,
+        action: newAction,
+        message: error instanceof Error ? error.message : String(error),
+      });
     } finally {
       setIsSubmitting(false);
     }

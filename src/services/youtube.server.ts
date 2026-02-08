@@ -1,5 +1,6 @@
 import type { Video } from "~/components/video-card";
 import { decodeHtmlEntities } from "~/lib/html-entities";
+import { log } from "~/lib/logger";
 import { applyFiltersAndRank } from "./apply-filters-rank.server";
 
 interface YouTubeSearchResponse {
@@ -178,10 +179,9 @@ export async function searchYouTubeVideos(
           detailsData = await detailsResponse.json();
         }
       } catch (parseError) {
-        console.warn(
-          "Failed to parse video details response, using empty data:",
-          parseError,
-        );
+        log.warn("youtube: failed to parse video details response", {
+          message: parseError instanceof Error ? parseError.message : String(parseError),
+        });
         detailsData = { items: [] };
       }
     }
@@ -299,7 +299,10 @@ export async function getVideoById(
       url: `https://www.youtube.com/watch?v=${item.id}`,
     };
   } catch (error) {
-    console.error("Failed to fetch video by ID:", error);
+    log.error("youtube: getVideoById failed", {
+      videoId,
+      message: error instanceof Error ? error.message : String(error),
+    });
     return null;
   }
 }
@@ -405,8 +408,10 @@ export async function handleYouTubeSearchRequest(
         ? 400
         : 500;
 
-    // Log the full error for debugging
-    console.error("YouTube search error:", error);
+    log.error("youtube: search request failed", {
+      message: errorMessage,
+      stack: error instanceof Error ? error.stack : undefined,
+    });
 
     return new Response(
       JSON.stringify({
@@ -454,15 +459,18 @@ export async function searchVideosWithFiltering(
         const candidates = await searchPool(pool, query, POOL_SEARCH_LIMIT);
         if (candidates.length > 0) {
           const filtered = await applyFiltersAndRank(candidates, maxResults);
-          console.log(
-            `Pool-only search: ${filtered.length} video(s) from pool (${pool.videos.length} total).`,
-          );
+          log.info("youtube: pool-only search", {
+            resultCount: filtered.length,
+            poolSize: pool.videos.length,
+          });
           return { videos: filtered, poolOnly: true };
         }
       }
       return { videos: [], poolOnly: true };
     } catch (poolErr) {
-      console.warn("Pool-only search failed:", poolErr);
+      log.warn("youtube: pool-only search failed", {
+        message: poolErr instanceof Error ? poolErr.message : String(poolErr),
+      });
       return { videos: [], poolOnly: true };
     }
   }
@@ -476,15 +484,18 @@ export async function searchVideosWithFiltering(
         if (candidates.length > 0) {
           const filtered = await applyFiltersAndRank(candidates, maxResults);
           if (filtered.length > 0) {
-            console.log(
-              `Served ${filtered.length} video(s) from pool (no API calls). Pool size: ${pool.videos.length}`,
-            );
+            log.info("youtube: served from pool (no API)", {
+              resultCount: filtered.length,
+              poolSize: pool.videos.length,
+            });
             return { videos: filtered };
           }
         }
       }
     } catch (poolErr) {
-      console.warn("Pool search failed, falling back to API:", poolErr);
+      log.warn("youtube: pool search failed, falling back to API", {
+        message: poolErr instanceof Error ? poolErr.message : String(poolErr),
+      });
     }
   }
 
@@ -538,10 +549,9 @@ export async function searchVideosWithFiltering(
         (video) => !allFeedbackIds.has(video.id),
       );
     } catch (feedbackError) {
-      console.warn(
-        "Failed to load feedback for repeat filtering:",
-        feedbackError,
-      );
+      log.warn("youtube: failed to load feedback for repeat filtering", {
+        message: feedbackError instanceof Error ? feedbackError.message : String(feedbackError),
+      });
       // Continue without repeat filtering if it fails
     }
 
@@ -564,12 +574,12 @@ export async function searchVideosWithFiltering(
       const { addToPool } = await import("./video-pool.server");
       const { added, total } = await addToPool(allFetchedVideos);
       if (added > 0) {
-        console.log(
-          `Pool updated: +${added} new videos (total ${total}). Future searches can use them without API calls.`,
-        );
+        log.info("youtube: pool updated", { added, total });
       }
     } catch (poolErr) {
-      console.warn("Failed to update pool:", poolErr);
+      log.warn("youtube: failed to update pool", {
+        message: poolErr instanceof Error ? poolErr.message : String(poolErr),
+      });
     }
   }
 
@@ -589,17 +599,22 @@ export async function searchVideosWithFiltering(
       videos = scored.map((s) => s.video);
     }
   } catch (recommendationError) {
-    console.warn("Recommendation model ranking skipped:", recommendationError);
+    log.warn("youtube: recommendation model ranking skipped", {
+      message: recommendationError instanceof Error ? recommendationError.message : String(recommendationError),
+    });
   }
 
   if (videos.length === 0 && totalFetched > 0) {
-    console.log(
-      `Searched through ${totalFetched} videos across ${pageCount} page(s) but found no authentic videos after filtering`,
-    );
+    log.info("youtube: no videos after filtering", {
+      totalFetched,
+      pageCount,
+    });
   } else if (videos.length > 0) {
-    console.log(
-      `Found ${videos.length} authentic video(s) after searching through ${totalFetched} videos across ${pageCount} page(s)`,
-    );
+    log.info("youtube: search completed", {
+      resultCount: videos.length,
+      totalFetched,
+      pageCount,
+    });
   }
 
   return { videos };

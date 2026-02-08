@@ -1,6 +1,7 @@
 import * as videosRepo from "~/db-repositories/videos";
 import type { VideoRow } from "~/db-repositories/videos";
 import type { Video } from "~/components/video-card";
+import { log } from "~/lib/logger";
 import { applyFiltersAndRank } from "./apply-filters-rank.server";
 
 export interface VideoPoolData {
@@ -68,6 +69,9 @@ export async function addToPool(
   const added = await videosRepo.insertMany(inserts);
   await videosRepo.evictOldest();
   const total = await videosRepo.count();
+  if (added > 0) {
+    log.info("video-pool: addToPool", { added, total });
+  }
   return { added, total };
 }
 

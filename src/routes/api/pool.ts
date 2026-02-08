@@ -1,4 +1,5 @@
 import { APIEvent } from "@solidjs/start/server";
+import { log } from "~/lib/logger";
 import { getPoolStatus, addToPool } from "~/services/video-pool.server";
 import { searchYouTubeVideos } from "~/services/youtube.server";
 import type { Video } from "~/components/video-card";
@@ -9,12 +10,14 @@ import type { Video } from "~/components/video-card";
 export async function GET(_event: APIEvent) {
   try {
     const status = await getPoolStatus();
+    log.info("pool GET: status", { count: status.count });
     return new Response(JSON.stringify(status), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
+    log.error("pool GET: failed", { message });
     return new Response(
       JSON.stringify({ error: "Failed to get pool status", message }),
       { status: 500, headers: { "Content-Type": "application/json" } }
@@ -34,6 +37,7 @@ export async function POST(event: APIEvent) {
   try {
     const contentType = event.request.headers.get("content-type");
     if (!contentType || !contentType.includes("application/json")) {
+      log.warn("pool POST: invalid content type");
       return new Response(
         JSON.stringify({ error: "Content-Type must be application/json" }),
         { status: 400, headers: { "Content-Type": "application/json" } }
@@ -52,12 +56,14 @@ export async function POST(event: APIEvent) {
     );
 
     if (!apiKey) {
+      log.warn("pool POST: missing apiKey");
       return new Response(
         JSON.stringify({ error: "apiKey is required" }),
         { status: 400, headers: { "Content-Type": "application/json" } }
       );
     }
     if (!Array.isArray(rawQueries) || rawQueries.length === 0) {
+      log.warn("pool POST: invalid or empty queries");
       return new Response(
         JSON.stringify({ error: "queries must be a non-empty array of strings" }),
         { status: 400, headers: { "Content-Type": "application/json" } }
@@ -69,6 +75,7 @@ export async function POST(event: APIEvent) {
       .slice(0, MAX_QUERIES);
 
     if (queries.length === 0) {
+      log.warn("pool POST: no valid queries after filter");
       return new Response(
         JSON.stringify({ error: "At least one non-empty query is required" }),
         { status: 400, headers: { "Content-Type": "application/json" } }
@@ -99,6 +106,13 @@ export async function POST(event: APIEvent) {
     }
 
     const { added, total } = await addToPool(allVideos);
+    log.info("pool POST: seeded", {
+      queries: queries.length,
+      videosFetched: allVideos.length,
+      pagesUsed: totalPagesUsed,
+      poolAdded: added,
+      poolTotal: total,
+    });
 
     return new Response(
       JSON.stringify({
@@ -113,6 +127,7 @@ export async function POST(event: APIEvent) {
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
+    log.error("pool POST: failed", { message });
     return new Response(
       JSON.stringify({
         error: "Failed to seed pool",

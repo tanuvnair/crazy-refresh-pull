@@ -1,4 +1,5 @@
 import { neon } from "@netlify/neon";
+import { log } from "~/lib/logger";
 
 /**
  * Neon PostgreSQL client. Reads NETLIFY_DATABASE_URL automatically.
@@ -13,6 +14,7 @@ let schemaInitialized = false;
 export async function ensureSchema(): Promise<void> {
   if (schemaInitialized) return;
 
+  log.info("db: ensuring schema (first run)");
   await sql`
     CREATE TABLE IF NOT EXISTS feedback (
       id            TEXT    PRIMARY KEY,
@@ -55,4 +57,5 @@ export async function ensureSchema(): Promise<void> {
   `;
 
   schemaInitialized = true;
+  log.info("db: schema ready");
 }

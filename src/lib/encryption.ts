@@ -2,6 +2,8 @@
 // Note: This is client-side obfuscation, not true security.
 // The API key will still be visible in network requests.
 
+import { log } from "~/lib/logger";
+
 const ENCRYPTION_KEY = "crazy-refresh-pull-secret-key-2024";
 
 /**
@@ -44,8 +46,9 @@ export function decryptApiKey(encrypted: string): string {
     
     return decrypted;
   } catch (error) {
-    // If decryption fails, return empty string
-    console.error("Failed to decrypt API key:", error);
+    log.error("encryption: failed to decrypt API key", {
+      message: error instanceof Error ? error.message : String(error),
+    });
     return "";
   }
 }
