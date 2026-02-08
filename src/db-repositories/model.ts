@@ -1,30 +1,28 @@
-import { sql, ensureSchema } from "~/services/db.server";
+import { prisma } from "~/services/db.server";
 
 /**
  * Get a value from the model key-value table.
  */
 export async function getValue(key: string): Promise<string | null> {
-  await ensureSchema();
-  const rows = await sql`SELECT value FROM model WHERE key = ${key}`;
-  if (rows.length === 0) return null;
-  return rows[0].value as string;
+  const row = await prisma.keyValueModel.findUnique({ where: { key } });
+  if (!row) return null;
+  return row.value;
 }
 
 /**
  * Set a value in the model key-value table.
  */
 export async function setValue(key: string, value: string): Promise<void> {
-  await ensureSchema();
-  await sql`
-    INSERT INTO model (key, value) VALUES (${key}, ${value})
-    ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
-  `;
+  await prisma.keyValueModel.upsert({
+    where: { key },
+    create: { key, value },
+    update: { value },
+  });
 }
 
 /**
  * Delete a key from the model table.
  */
 export async function deleteKey(key: string): Promise<void> {
-  await ensureSchema();
-  await sql`DELETE FROM model WHERE key = ${key}`;
+  await prisma.keyValueModel.deleteMany({ where: { key } });
 }

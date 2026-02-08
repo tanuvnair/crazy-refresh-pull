@@ -15,10 +15,10 @@ function rowToVideo(row: VideoRow): Video {
     title: row.title,
     description: row.description ?? "",
     thumbnail: row.thumbnail ?? "",
-    channelTitle: row.channel_title ?? "",
-    publishedAt: row.published_at ?? "",
-    viewCount: row.view_count ?? undefined,
-    likeCount: row.like_count ?? undefined,
+    channelTitle: row.channelTitle ?? "",
+    publishedAt: row.publishedAt ?? "",
+    viewCount: row.viewCount ?? undefined,
+    likeCount: row.likeCount ?? undefined,
     url: row.url,
   };
 }
@@ -54,7 +54,7 @@ export async function readPool(): Promise<VideoPoolData> {
   const rows = await videosRepo.findAll();
   const lastRow = rows[0];
   return {
-    updatedAt: lastRow?.created_at ?? new Date(0).toISOString(),
+    updatedAt: lastRow?.createdAt?.toISOString() ?? new Date(0).toISOString(),
     videos: rows.map(rowToVideo),
   };
 }

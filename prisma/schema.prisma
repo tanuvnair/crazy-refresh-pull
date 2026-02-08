@@ -1,0 +1,46 @@
+generator client {
+  provider = "prisma-client"
+  output   = "./generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Video {
+  id           String   @id
+  title        String
+  description  String?
+  thumbnail    String?
+  channelTitle String?  @map("channel_title")
+  publishedAt  String?  @map("published_at")
+  viewCount    String?  @map("view_count")
+  likeCount    String?  @map("like_count")
+  url          String
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  @@map("videos")
+}
+
+model Feedback {
+  id           String   @id
+  sentiment    String
+  title        String?
+  description  String?
+  channelTitle String?  @map("channel_title")
+  publishedAt  String?  @map("published_at")
+  viewCount    String?  @map("view_count")
+  likeCount    String?  @map("like_count")
+  url          String?
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  @@index([sentiment], name: "idx_feedback_sentiment")
+  @@map("feedback")
+}
+
+model KeyValueModel {
+  key   String @id
+  value String
+
+  @@map("model")
+}

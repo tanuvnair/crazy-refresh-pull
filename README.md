@@ -6,7 +6,7 @@ A personalized YouTube discovery app that surfaces long-form videos. You seed a 
 
 - **Frontend:** Solid.js, Solid Start (Vinxi), Solid Router, Tailwind CSS, Lucide icons
 - **Backend:** Solid Start API routes (server-side)
-- **Database:** Neon PostgreSQL via `@netlify/neon` (uses `NETLIFY_DATABASE_URL`)
+- **Database:** PostgreSQL via Prisma ORM (uses `DATABASE_URL`)
 - **External:** YouTube Data API v3 (user-supplied API key; optional for pool-only usage)
 
 ## Architecture and data flow
@@ -40,7 +40,7 @@ flowchart LR
     feedbackSvc[feedback.server]
     modelSvc[recommendation-model.server]
   end
-  subgraph db [Neon PostgreSQL]
+  subgraph db [PostgreSQL]
     videos[(videos)]
     feedbackTable[(feedback)]
     modelTable[(model)]
@@ -97,14 +97,14 @@ Logistic regression (10 hand-crafted features) trained on positive/negative feed
 | Directory              | Role                                                                                                                                       |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | `src/routes/`          | [index.tsx](src/routes/index.tsx) (home + feed/search UI), [api/](src/routes/api/) (feed, youtube, pool, feedback, add-video, train-model) |
-| `src/services/`        | Server-only: db.server (Neon + schema), video-pool, youtube, apply-filters-rank, feedback, recommendation-model                             |
+| `src/services/`        | Server-only: db.server (Prisma client), video-pool, youtube, apply-filters-rank, feedback, recommendation-model                              |
 | `src/db-repositories/` | Data access: videos, feedback, model                                                                                                       |
 | `src/components/`      | video-card, settings-dialog, ui/                                                                                                           |
 | `src/lib/`             | cookie, encryption (API key obfuscation), html-entities, utils                                                                             |
 
 ## Environment variables
 
-- **NETLIFY_DATABASE_URL** (required): PostgreSQL connection string for Neon. The app uses `@netlify/neon`, which reads this automatically. Do not commit real values.
+- **DATABASE_URL** (required): PostgreSQL connection string. Used by Prisma ORM for database access. Do not commit real values.
 - **YOUTUBE_API_KEY** (optional): Can be set server-side for API fallback; typically users provide their own key in Settings (stored client-side in cookie/sessionStorage, sent per request).
 
 ## Getting started
@@ -112,7 +112,7 @@ Logistic regression (10 hand-crafted features) trained on positive/negative feed
 **Prerequisites:** Node >= 22 (see [package.json](package.json) engines).
 
 1. **Install:** `npm install`
-2. **Database:** Set `NETLIFY_DATABASE_URL` in `.env`. On first run the app creates tables (`feedback`, `videos`, `model`) via [db.server.ts](src/services/db.server.ts) `ensureSchema()`.
+2. **Database:** Set `DATABASE_URL` in `.env`. Run `npx prisma db push` to create/sync the database schema, then `npx prisma generate` to generate the Prisma client.
 3. **Run dev:** `npm run dev`
 4. **Build / start:** `npm run build`, `npm run start`
 

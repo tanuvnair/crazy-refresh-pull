@@ -332,7 +332,7 @@ export async function trainModel(): Promise<{
 }
 
 /**
- * Load the recommendation model (cached in-memory, persisted in Neon PostgreSQL).
+ * Load the recommendation model (cached in-memory, persisted in PostgreSQL via Prisma).
  */
 export async function loadModel(): Promise<RecommendationModelData | null> {
   return await loadModelFromDb();

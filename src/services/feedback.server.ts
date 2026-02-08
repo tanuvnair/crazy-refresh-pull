@@ -17,10 +17,10 @@ function rowToMetadata(row: FeedbackRow): VideoMetadata {
     id: row.id,
     title: row.title ?? undefined,
     description: row.description ?? undefined,
-    channelTitle: row.channel_title ?? undefined,
-    publishedAt: row.published_at ?? undefined,
-    viewCount: row.view_count ?? undefined,
-    likeCount: row.like_count ?? undefined,
+    channelTitle: row.channelTitle ?? undefined,
+    publishedAt: row.publishedAt ?? undefined,
+    viewCount: row.viewCount ?? undefined,
+    likeCount: row.likeCount ?? undefined,
     url: row.url ?? undefined,
   };
 }
