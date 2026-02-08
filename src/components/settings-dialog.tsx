@@ -2,7 +2,6 @@ import { createSignal } from "solid-js";
 import { cn } from "~/lib/utils";
 import {
   Button,
-  Checkbox,
   Dialog,
   DialogContent,
   DialogHeader,
@@ -19,7 +18,6 @@ import {
 import { Check, Eye, EyeOff, Loader, Plus, Sparkles, Database } from "lucide-solid";
 
 export interface FilterSettingsShape {
-  authenticityThreshold: number;
   maxPagesToSearch: number;
   maxTotalVideosToFetch: number;
   minVideoDurationSeconds: number;
@@ -47,8 +45,6 @@ export interface SettingsDialogProps {
   onSaveYoutubeApiKey: () => void;
   onClearYoutubeApiKey: () => void;
   searchLoading: boolean;
-  useCustomFiltering: boolean;
-  onCustomFilteringToggle: (enabled: boolean) => void;
   filterSettings: FilterSettingsShape;
   onFilterSettingsChange: (key: keyof FilterSettingsShape, value: number) => void;
   favoriteVideoUrl: string;
@@ -176,48 +172,9 @@ export default function SettingsDialog(props: SettingsDialogProps) {
             </div>
           </SettingsGroup>
 
-          {/* -- Section: Content Filtering -- */}
-          <SettingsSection class="pb-1">Content Filtering</SettingsSection>
+          {/* -- Section: Search & duration -- */}
+          <SettingsSection class="pb-1">Search & duration</SettingsSection>
           <SettingsGroup>
-            <SettingsRow
-              label="AI-powered filtering"
-              description="Analyzes titles and engagement for authentic content"
-            >
-              <Checkbox
-                id="use-custom-filtering"
-                checked={props.useCustomFiltering}
-                onChange={(e) =>
-                  props.onCustomFilteringToggle(e.currentTarget.checked)
-                }
-                disabled={props.searchLoading}
-              />
-            </SettingsRow>
-            <SettingsRow label="Authenticity threshold">
-              <div class="flex items-center gap-3 w-40">
-                <Input
-                  id="authenticity-threshold"
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  value={props.filterSettings.authenticityThreshold}
-                  onInput={(e) => {
-                    const value = parseFloat(e.currentTarget.value);
-                    props.onFilterSettingsChange("authenticityThreshold", value);
-                    e.currentTarget.style.setProperty(
-                      "--fill-percentage",
-                      `${value * 100}%`
-                    );
-                  }}
-                  disabled={props.searchLoading}
-                  class="slider-with-fill flex-1"
-                  style={`--fill-percentage: ${props.filterSettings.authenticityThreshold * 100}%`}
-                />
-                <span class="text-xs tabular-nums text-muted-foreground w-8 text-right">
-                  {props.filterSettings.authenticityThreshold.toFixed(2)}
-                </span>
-              </div>
-            </SettingsRow>
             <SettingsRow
               label="Max pages to search"
               description="Used when searching YouTube"

@@ -1,6 +1,6 @@
 # Crazy Refresh Pull
 
-A personalized YouTube discovery app that surfaces "authentic" long-form videos. You seed a local video pool (from YouTube search or by adding favorites), give like/dislike feedback, optionally train a recommendation model, and get a feed or search results that prefer pool-first (to save API quota) and that are filtered and ranked by custom heuristics and your feedback.
+A personalized YouTube discovery app that surfaces long-form videos. You seed a local video pool (from YouTube search or by adding favorites), give like/dislike feedback, and optionally train a learned recommendation model. The feed and search prefer pool-first (to save API quota) and rank results using the model trained on your feedback.
 
 ## Tech stack
 
@@ -12,11 +12,11 @@ A personalized YouTube discovery app that surfaces "authentic" long-form videos.
 ## Architecture and data flow
 
 - **User actions:** Open app, refresh feed, search, like/dislike, add favorite by URL, open Settings (API key, filter settings, seed pool, train model).
-- **Feed path:** `GET /api/feed` -> `video-pool.server` `getRandomRecommendations()` -> DB pool -> `apply-filters-rank.server` (exclude feedback, optional custom filter, optional model ranking) -> JSON to client.
-- **Search path:** Client calls `GET /api/youtube?q=...` -> `youtube.server` `handleYouTubeSearchRequest` -> if `usePoolFirst`: `video-pool.server` `searchPool()` then `applyFiltersAndRank`; else YouTube API search + details, then same filter/rank; new results are merged into pool via `addToPool`.
+- **Feed path:** `GET /api/feed` -> `video-pool.server` `getRandomRecommendations()` -> DB pool -> `apply-filters-rank.server` (exclude feedback, then rank by learned model when available) -> JSON to client.
+- **Search path:** Client calls `GET /api/youtube?q=...` -> `youtube.server` `handleYouTubeSearchRequest` -> if pool has results: `video-pool.server` `searchPool()` then `applyFiltersAndRank`; else YouTube API search + details, then `applyFiltersAndRank`; new API results are merged into pool via `addToPool`.
 - **Feedback:** Like/Dislike/Remove via `POST /api/feedback` -> `feedback.server` and `db-repositories/feedback`; Add favorite via `POST /api/add-video` (YouTube fetch + add positive feedback).
 - **Pool seeding:** `POST /api/pool` with `apiKey` + `queries` -> YouTube search per query -> `addToPool` -> DB `videos` (with eviction at MAX_POOL_SIZE).
-- **Model:** `POST /api/train-model` -> `recommendation-model.server` trains logistic regression on positive/negative feedback metadata; model stored in DB `model`. Used in `applyFiltersAndRank` and YouTube search path to rank results.
+- **Model:** `POST /api/train-model` -> `recommendation-model.server` trains logistic regression on positive/negative feedback; model stored in DB `model`. Used in `applyFiltersAndRank` to rank feed and search results.
 
 ```mermaid
 flowchart LR
@@ -36,7 +36,6 @@ flowchart LR
   subgraph services [Services]
     videoPool[video-pool.server]
     yt[youtube.server]
-    filter[filter.server]
     applyRank[apply-filters-rank.server]
     feedbackSvc[feedback.server]
     modelSvc[recommendation-model.server]
@@ -67,7 +66,6 @@ flowchart LR
   videoPool --> videos
   feedbackSvc --> feedbackTable
   modelSvc --> modelTable
-  applyRank --> filter
   applyRank --> modelSvc
   applyRank --> feedbackSvc
 ```
@@ -80,30 +78,26 @@ Local cache of videos (table `videos`). Filled by search results and pool seedin
 
 ### Feed
 
-Random recommendations from the pool, after excluding already-feedback videos, optional authenticity filtering, and optional model-based ranking.
+Random recommendations from the pool. Already-liked/disliked videos are excluded; when the recommendation model is trained, results are ranked by it.
 
 ### Search
 
-Query can be served from pool (`searchByTerms` + filter/rank) or, if no API key or pool miss, from YouTube API; results are merged into pool.
+Query is served from the pool when possible (`searchPool` + `applyFiltersAndRank`); otherwise the app calls the YouTube API (using Settings: max pages, max videos, min duration), then applies the same exclusion and ranking. New API results are merged into the pool.
 
 ### Feedback
 
-Like / dislike / remove stored in `feedback` with optional metadata (title, description, channel, etc.). Used to exclude from results, to train the recommendation model, and to build keyword/channel patterns for the custom filter.
-
-### Custom filtering
-
-`filter.server` scores videos (clickbait, description quality, engagement, feedback-based keyword/channel match) and keeps videos above `authenticityThreshold` (default 0.4).
+Like / dislike / remove stored in `feedback` with optional metadata (title, description, channel, etc.). Used to exclude those videos from results and to train the recommendation model (which uses the same metadata for features).
 
 ### Recommendation model
 
-Logistic regression (10 features) trained on positive/negative feedback; used to score and rank videos in feed and search.
+Logistic regression (10 hand-crafted features) trained on positive/negative feedback. When trained, it scores and ranks videos in feed and search; no rule-based filtering is applied.
 
 ## Project structure
 
 | Directory              | Role                                                                                                                                       |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | `src/routes/`          | [index.tsx](src/routes/index.tsx) (home + feed/search UI), [api/](src/routes/api/) (feed, youtube, pool, feedback, add-video, train-model) |
-| `src/services/`        | Server-only: db.server (Neon + schema), video-pool, youtube, filter, apply-filters-rank, feedback, recommendation-model                    |
+| `src/services/`        | Server-only: db.server (Neon + schema), video-pool, youtube, apply-filters-rank, feedback, recommendation-model                             |
 | `src/db-repositories/` | Data access: videos, feedback, model                                                                                                       |
 | `src/components/`      | video-card, settings-dialog, ui/                                                                                                           |
 | `src/lib/`             | cookie, encryption (API key obfuscation), html-entities, utils                                                                             |
@@ -126,8 +120,8 @@ Logistic regression (10 features) trained on positive/negative feedback; used to
 
 | Endpoint           | Method | Purpose                                                                                              |
 | ------------------ | ------ | ---------------------------------------------------------------------------------------------------- |
-| `/api/feed`        | GET    | Random recommendations from pool (limit, useCustomFiltering, authenticityThreshold, optional apiKey) |
-| `/api/youtube`     | GET    | Search: pool-first then YouTube; query params q, apiKey, useCustomFiltering, maxResults, etc.        |
+| `/api/feed`        | GET    | Random recommendations from pool (limit, optional apiKey)                                            |
+| `/api/youtube`     | GET    | Search: pool-first then YouTube; query params q, apiKey, maxResults, maxPagesToSearch, maxTotalVideosToFetch, minVideoDurationSeconds, usePoolFirst |
 | `/api/pool`        | GET    | Pool status (count, updatedAt)                                                                       |
 | `/api/pool`        | POST   | Seed pool (body: apiKey, queries, maxPagesPerQuery)                                                  |
 | `/api/feedback`    | GET    | Feedback status for videoId or batch videoIds                                                        |

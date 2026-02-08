@@ -337,8 +337,6 @@ export interface SearchVideosOptions {
   query: string;
   youtubeApiKey: string;
   maxResults?: number;
-  useCustomFiltering?: boolean;
-  authenticityThreshold?: number;
   maxPagesToSearch?: number;
   maxTotalVideosToFetch?: number;
   minVideoDurationSeconds?: number;
@@ -364,14 +362,7 @@ export async function handleYouTubeSearchRequest(
     const maxResults = parseInt(url.searchParams.get("maxResults") || "10", 10);
     const apiKey =
       url.searchParams.get("apiKey") || process.env.YOUTUBE_API_KEY || "";
-    const useCustomFiltering =
-      url.searchParams.get("useCustomFiltering") !== "false"; // Default to true
-
-    // Get filter settings from query params
     // YouTube API quota limits: 10,000 units/day, ~101 units per page (100 for search + 1 for videos.list)
-    const authenticityThreshold = parseFloat(
-      url.searchParams.get("authenticityThreshold") || "0.4",
-    );
     let maxPagesToSearch = parseInt(
       url.searchParams.get("maxPagesToSearch") || "20",
       10,
@@ -396,8 +387,6 @@ export async function handleYouTubeSearchRequest(
       query,
       youtubeApiKey: apiKey,
       maxResults,
-      useCustomFiltering,
-      authenticityThreshold,
       maxPagesToSearch,
       maxTotalVideosToFetch,
       minVideoDurationSeconds,
@@ -434,8 +423,8 @@ export async function handleYouTubeSearchRequest(
 }
 
 /**
- * Search YouTube videos with optional custom AI filtering.
- * When usePoolFirst is true, searches the local video pool first (no API cost); falls back to API only when needed.
+ * Search YouTube videos. When usePoolFirst is true, searches the local video pool first (no API cost); falls back to API only when needed.
+ * Ranking uses the learned recommendation model when available.
  */
 export async function searchVideosWithFiltering(
   options: SearchVideosOptions,
@@ -444,8 +433,6 @@ export async function searchVideosWithFiltering(
     query,
     youtubeApiKey,
     maxResults = 50,
-    useCustomFiltering = true,
-    authenticityThreshold = 0.4,
     maxPagesToSearch = 20,
     maxTotalVideosToFetch = 1000,
     minVideoDurationSeconds = 60,
@@ -466,12 +453,7 @@ export async function searchVideosWithFiltering(
       if (pool.videos.length > 0) {
         const candidates = await searchPool(pool, query, POOL_SEARCH_LIMIT);
         if (candidates.length > 0) {
-          const filtered = await applyFiltersAndRank(
-            candidates,
-            maxResults,
-            useCustomFiltering,
-            authenticityThreshold,
-          );
+          const filtered = await applyFiltersAndRank(candidates, maxResults);
           console.log(
             `Pool-only search: ${filtered.length} video(s) from pool (${pool.videos.length} total).`,
           );
@@ -492,12 +474,7 @@ export async function searchVideosWithFiltering(
       if (pool.videos.length > 0) {
         const candidates = await searchPool(pool, query, POOL_SEARCH_LIMIT);
         if (candidates.length > 0) {
-          const filtered = await applyFiltersAndRank(
-            candidates,
-            maxResults,
-            useCustomFiltering,
-            authenticityThreshold,
-          );
+          const filtered = await applyFiltersAndRank(candidates, maxResults);
           if (filtered.length > 0) {
             console.log(
               `Served ${filtered.length} video(s) from pool (no API calls). Pool size: ${pool.videos.length}`,
@@ -566,37 +543,6 @@ export async function searchVideosWithFiltering(
         feedbackError,
       );
       // Continue without repeat filtering if it fails
-    }
-
-    // Apply custom AI filtering if enabled
-    if (useCustomFiltering && filteredPageVideos.length > 0) {
-      try {
-        const videosBeforeFiltering = filteredPageVideos.length;
-        const { analyzeVideos, filterVideosByAnalysis } =
-          await import("./filter.server");
-        const analysisResults = await analyzeVideos(
-          filteredPageVideos,
-          authenticityThreshold,
-        );
-        filteredPageVideos = await filterVideosByAnalysis(
-          filteredPageVideos,
-          analysisResults,
-          authenticityThreshold,
-        );
-        const videosAfterFiltering = filteredPageVideos.length;
-
-        if (pageCount > 1 || videosAfterFiltering < maxResults) {
-          console.log(
-            `Page ${pageCount}: ${videosBeforeFiltering} → ${videosAfterFiltering} videos after filtering (${allFetchedVideos.length + videosAfterFiltering}/${maxResults} needed)`,
-          );
-        }
-      } catch (filterError) {
-        console.error(
-          "Failed to analyze videos with custom filter:",
-          filterError,
-        );
-        // If filtering fails, use the videos we already have (graceful degradation)
-      }
     }
 
     // Add filtered videos to our collection

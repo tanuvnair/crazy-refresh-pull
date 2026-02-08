@@ -3,9 +3,8 @@ import { getRandomRecommendations } from "~/services/video-pool.server";
 
 /**
  * GET /api/feed
- * Returns random authentic videos from the pool (no YouTube API calls).
- * API key is optional; when omitted, poolOnly is true in the response.
- * Query params: limit (default 20), useCustomFiltering, authenticityThreshold, apiKey (optional).
+ * Returns random videos from the pool (no YouTube API calls). Excludes feedback and ranks with the learned model when available.
+ * Query params: limit (default 20), apiKey (optional).
  */
 export async function GET(event: APIEvent) {
   try {
@@ -15,16 +14,8 @@ export async function GET(event: APIEvent) {
       100,
     );
     const apiKey = (url.searchParams.get("apiKey") || "").trim();
-    const useCustomFiltering =
-      url.searchParams.get("useCustomFiltering") !== "false";
-    const authenticityThreshold = parseFloat(
-      url.searchParams.get("authenticityThreshold") || "0.4",
-    );
 
-    const videos = await getRandomRecommendations(limit, {
-      useCustomFiltering,
-      authenticityThreshold,
-    });
+    const videos = await getRandomRecommendations(limit);
 
     const poolOnly = !apiKey;
     const body: { videos: typeof videos; empty?: boolean; poolOnly?: boolean } =

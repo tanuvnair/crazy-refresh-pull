@@ -1,14 +1,12 @@
 import type { Video } from "~/components/video-card";
 
 /**
- * Apply feedback exclusion, custom filtering, and recommendation ranking to a list of videos.
- * Shared by feed, pool search, and YouTube API path.
+ * Apply feedback exclusion and recommendation-model ranking to a list of videos.
+ * Shared by feed, pool search, and YouTube API path. No rule-based filtering.
  */
 export async function applyFiltersAndRank(
   videos: Video[],
   maxResults: number,
-  useCustomFiltering: boolean,
-  authenticityThreshold: number,
 ): Promise<Video[]> {
   let out = videos;
   try {
@@ -20,20 +18,6 @@ export async function applyFiltersAndRank(
     out = out.filter((video) => !allFeedbackIds.has(video.id));
   } catch {
     // Continue without feedback filter
-  }
-  if (useCustomFiltering && out.length > 0) {
-    try {
-      const { analyzeVideos, filterVideosByAnalysis } =
-        await import("./filter.server");
-      const analysisResults = await analyzeVideos(out, authenticityThreshold);
-      out = await filterVideosByAnalysis(
-        out,
-        analysisResults,
-        authenticityThreshold,
-      );
-    } catch {
-      // Keep current list
-    }
   }
   out = out.slice(0, maxResults);
   try {

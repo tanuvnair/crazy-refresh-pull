@@ -103,31 +103,15 @@ export async function searchPool(
   return scored.map((s) => rowToVideo(s.row));
 }
 
-export interface GetRandomRecommendationsOptions {
-  useCustomFiltering?: boolean;
-  authenticityThreshold?: number;
-}
-
 /**
- * Get random recommendations from the pool, filtered and ranked like search results.
- * Fetches more candidates than needed to account for filtering.
+ * Get random recommendations from the pool. Excludes feedback and ranks with the learned model when available.
  */
-export async function getRandomRecommendations(
-  limit: number,
-  options?: GetRandomRecommendationsOptions,
-): Promise<Video[]> {
-  const useCustomFiltering = options?.useCustomFiltering ?? true;
-  const authenticityThreshold = options?.authenticityThreshold ?? 0.4;
+export async function getRandomRecommendations(limit: number): Promise<Video[]> {
   const candidateLimit = Math.min(limit * 3, 300);
   const rows = await videosRepo.findRandom(candidateLimit);
   const candidates = rows.map(rowToVideo);
   if (candidates.length === 0) return [];
-  return applyFiltersAndRank(
-    candidates,
-    limit,
-    useCustomFiltering,
-    authenticityThreshold,
-  );
+  return applyFiltersAndRank(candidates, limit);
 }
 
 /**

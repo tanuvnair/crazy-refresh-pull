@@ -8,14 +8,12 @@ import { encryptApiKey, decryptApiKey } from "~/lib/encryption";
 import { getYouTubeApiKeyFromCookie, saveYouTubeApiKeyToCookie } from "~/lib/cookie";
 
 const YOUTUBE_API_KEY_STORAGE_KEY = "youtube_api_key_encrypted";
-const USE_CUSTOM_FILTERING_KEY = "use_custom_filtering";
 const FILTER_SETTINGS_KEY = "filter_settings";
 
 interface FilterSettings {
-  authenticityThreshold: number; // 0-1, default 0.4
-  maxPagesToSearch: number; // default 20
-  maxTotalVideosToFetch: number; // default 1000
-  minVideoDurationSeconds: number; // default 60
+  maxPagesToSearch: number;
+  maxTotalVideosToFetch: number;
+  minVideoDurationSeconds: number;
 }
 
 // Module-level flag to track if component has been mounted before (for HMR)
@@ -24,7 +22,6 @@ let hasMountedBefore = false;
 export default function Home() {
   const [youtubeApiKey, setYoutubeApiKey] = createSignal("");
   const [showYoutubeApiKey, setShowYoutubeApiKey] = createSignal(false);
-  const [useCustomFiltering, setUseCustomFiltering] = createSignal(true);
   const [searchQuery, setSearchQuery] = createSignal("");
   const [feedVideos, setFeedVideos] = createSignal<Video[]>([]);
   const [searchVideos, setSearchVideos] = createSignal<Video[]>([]);
@@ -56,9 +53,8 @@ export default function Home() {
   // - Max videos per day: ~4,950 videos (99 pages * 50)
   // Defaults are conservative to allow multiple searches per day
   const [filterSettings, setFilterSettings] = createSignal<FilterSettings>({
-    authenticityThreshold: 0.4,
-    maxPagesToSearch: 20, // ~2,020 units per search (allows ~4-5 searches per day)
-    maxTotalVideosToFetch: 1000, // Conservative limit per search
+    maxPagesToSearch: 20,
+    maxTotalVideosToFetch: 1000,
     minVideoDurationSeconds: 60,
   });
 
@@ -88,13 +84,6 @@ export default function Home() {
         }
       }
 
-      // Load custom filtering preference
-      const useCustom = sessionStorage.getItem(USE_CUSTOM_FILTERING_KEY);
-      if (useCustom !== null) {
-        setUseCustomFiltering(useCustom === "true");
-      }
-
-      // Load filter settings
       // Load recommendation model status
       try {
         const statusRes = await fetch("/api/train-model");
@@ -124,17 +113,13 @@ export default function Home() {
       const settingsJson = sessionStorage.getItem(FILTER_SETTINGS_KEY);
       if (settingsJson) {
         try {
-          const settings = JSON.parse(settingsJson) as FilterSettings;
-          // Clamp values to respect YouTube API quota limits
+          const settings = JSON.parse(settingsJson) as Partial<FilterSettings>;
           const clampedSettings: FilterSettings = {
-            ...settings,
-            maxPagesToSearch: Math.min(Math.max(1, settings.maxPagesToSearch || 20), 95),
-            maxTotalVideosToFetch: Math.min(Math.max(50, settings.maxTotalVideosToFetch || 1000), 4750),
-            minVideoDurationSeconds: Math.min(Math.max(0, settings.minVideoDurationSeconds || 60), 600),
-            authenticityThreshold: Math.min(Math.max(0, settings.authenticityThreshold || 0.4), 1),
+            maxPagesToSearch: Math.min(Math.max(1, settings.maxPagesToSearch ?? 20), 95),
+            maxTotalVideosToFetch: Math.min(Math.max(50, settings.maxTotalVideosToFetch ?? 1000), 4750),
+            minVideoDurationSeconds: Math.min(Math.max(0, settings.minVideoDurationSeconds ?? 60), 600),
           };
           setFilterSettings(clampedSettings);
-          // Save clamped values back to storage
           sessionStorage.setItem(FILTER_SETTINGS_KEY, JSON.stringify(clampedSettings));
         } catch (err) {
           console.error("Failed to parse filter settings:", err);
@@ -151,8 +136,6 @@ export default function Home() {
     const params = new URLSearchParams({ limit: "20" });
     const key = youtubeApiKey().trim();
     if (key) params.set("apiKey", key);
-    params.set("useCustomFiltering", useCustomFiltering() ? "true" : "false");
-    params.set("authenticityThreshold", filterSettings().authenticityThreshold.toString());
     return params;
   };
 
@@ -198,12 +181,6 @@ export default function Home() {
     } catch (err) {
       console.error("Failed to save YouTube API key to storage:", err);
     }
-  };
-
-  // Toggle custom filtering
-  const handleCustomFilteringToggle = (enabled: boolean) => {
-    setUseCustomFiltering(enabled);
-    sessionStorage.setItem(USE_CUSTOM_FILTERING_KEY, enabled.toString());
   };
 
   // Update filter settings
@@ -371,7 +348,6 @@ export default function Home() {
     const inputElement = document.getElementById("search-query") as HTMLInputElement;
     const query = inputElement ? inputElement.value.trim() : searchQuery().trim();
     const youtubeKey = youtubeApiKey().trim();
-    const useCustom = useCustomFiltering();
 
     if (inputElement && inputElement.value !== searchQuery()) {
       setSearchQuery(inputElement.value);
@@ -393,9 +369,7 @@ export default function Home() {
         maxResults: "50",
       });
       if (youtubeKey) params.set("apiKey", youtubeKey);
-      params.set("useCustomFiltering", useCustom ? "true" : "false");
       const settings = filterSettings();
-      params.set("authenticityThreshold", settings.authenticityThreshold.toString());
       params.set("maxPagesToSearch", settings.maxPagesToSearch.toString());
       params.set("maxTotalVideosToFetch", settings.maxTotalVideosToFetch.toString());
       params.set("minVideoDurationSeconds", settings.minVideoDurationSeconds.toString());
@@ -560,8 +534,6 @@ export default function Home() {
             onSaveYoutubeApiKey={handleSaveYoutubeApiKey}
             onClearYoutubeApiKey={handleClearYoutubeApiKey}
             searchLoading={searchLoading()}
-            useCustomFiltering={useCustomFiltering()}
-            onCustomFilteringToggle={handleCustomFilteringToggle}
             filterSettings={filterSettings()}
             onFilterSettingsChange={handleFilterSettingsChange}
             favoriteVideoUrl={favoriteVideoUrl()}
