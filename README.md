@@ -11,6 +11,7 @@ A personalized YouTube discovery app that surfaces long-form videos. You seed a 
 
 ## Architecture and data flow
 
+- **Middleware:** All requests pass through [src/middleware](src/middleware/index.ts), which logs request/response (method, path, status, duration) and redacts sensitive headers (authorization, cookie, x-api-key).
 - **User actions:** Open app, refresh feed, search, like/dislike, add favorite by URL, open Settings (API key, filter settings, seed pool, train model).
 - **Feed path:** `GET /api/feed` -> `video-pool.server` `getRandomRecommendations()` -> DB pool -> `apply-filters-rank.server` (exclude feedback, then rank by learned model when available) -> JSON to client.
 - **Search path:** Client calls `GET /api/youtube?q=...` -> `youtube.server` `handleYouTubeSearchRequest` -> if pool has results: `video-pool.server` `searchPool()` then `applyFiltersAndRank`; else YouTube API search + details, then `applyFiltersAndRank`; new API results are merged into pool via `addToPool`.
@@ -96,11 +97,13 @@ Logistic regression (10 hand-crafted features) trained on positive/negative feed
 
 | Directory              | Role                                                                                                                                       |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| (root)                 | [app.config.ts](app.config.ts) (Solid Start + middleware), [prisma.config.ts](prisma.config.ts) (Prisma schema, migrations, DATABASE_URL)  |
 | `src/routes/`          | [index.tsx](src/routes/index.tsx) (home + feed/search UI), [api/](src/routes/api/) (feed, youtube, pool, feedback, add-video, train-model) |
-| `src/services/`        | Server-only: db.server (Prisma client), video-pool, youtube, apply-filters-rank, feedback, recommendation-model                              |
+| `src/services/`        | Server-only: db.server (Prisma client), video-pool, youtube, apply-filters-rank, feedback, recommendation-model                            |
 | `src/db-repositories/` | Data access: videos, feedback, model                                                                                                       |
-| `src/components/`      | video-card, settings-dialog, ui/                                                                                                           |
-| `src/lib/`             | cookie, encryption (API key obfuscation), html-entities, utils                                                                             |
+| `src/components/`      | video-card, settings-dialog, client-logging, ui/                                                                                           |
+| `src/lib/`             | cookie, encryption (API key obfuscation), html-entities, logger (structured JSON logging), utils                                          |
+| `src/middleware/`      | Request/response logging with sensitive header redaction                                                                                    |
 
 ## Environment variables
 
@@ -112,9 +115,11 @@ Logistic regression (10 hand-crafted features) trained on positive/negative feed
 **Prerequisites:** Node >= 22 (see [package.json](package.json) engines).
 
 1. **Install:** `npm install`
-2. **Database:** Set `DATABASE_URL` in `.env`. Run `npx prisma db push` to create/sync the database schema, then `npx prisma generate` to generate the Prisma client.
+2. **Database:** Set `DATABASE_URL` in `.env`. Then either:
+   - **Using migrations:** `npx prisma migrate deploy` to apply migrations, then `npx prisma generate`.
+   - **Schema sync only:** `npx prisma db push` to create/sync the schema, then `npx prisma generate`.
 3. **Run dev:** `npm run dev`
-4. **Build / start:** `npm run build`, `npm run start`
+4. **Build / start:** `npm run build`, `npm run start` (prebuild runs `prisma generate` before build)
 
 ## API reference
 
@@ -127,7 +132,7 @@ Logistic regression (10 hand-crafted features) trained on positive/negative feed
 | `/api/feedback`    | GET    | Feedback status for videoId or batch videoIds                                                        |
 | `/api/feedback`    | POST   | Like / dislike / remove (body: action, videoId, metadata)                                            |
 | `/api/add-video`   | POST   | Add video by URL as positive feedback (body: url, apiKey)                                            |
-| `/api/train-model` | GET    | Model status (available, counts, trainedAt)                                                          |
+| `/api/train-model` | GET    | Model status (available, positiveCount, negativeCount, trainedAt, positiveCountWhenTrained, negativeCountWhenTrained) |
 | `/api/train-model` | POST   | Train recommendation model on current feedback                                                       |
 
 ## YouTube API quota
