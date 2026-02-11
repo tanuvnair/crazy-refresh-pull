@@ -4,8 +4,8 @@
   "scripts": {
     "dev": "vinxi dev",
     "lint": "eslint .",
-    "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "format": "prettier --write .",
     "prebuild": "prisma generate",
     "build": "vinxi build",
     "start": "vinxi start",
