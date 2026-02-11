@@ -21,7 +21,7 @@ const Container: Component<ContainerProps> = (props) => {
       class={cn(
         "mx-auto w-full px-4 sm:px-6 lg:px-8",
         sizeClasses[local.size || "md"],
-        local.class
+        local.class,
       )}
       {...others}
     >

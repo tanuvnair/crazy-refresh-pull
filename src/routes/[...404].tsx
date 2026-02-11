@@ -1,7 +1,14 @@
 import { Title } from "@solidjs/meta";
 import { HttpStatusCode } from "@solidjs/start";
 import { A } from "@solidjs/router";
-import { Button, Card, CardHeader, CardTitle, CardFooter, Text } from "~/components/ui";
+import {
+  Button,
+  Card,
+  CardHeader,
+  CardTitle,
+  CardFooter,
+  Text,
+} from "~/components/ui";
 import ArrowLeft from "lucide-solid/icons/arrow-left";
 import RefreshCw from "lucide-solid/icons/refresh-cw";
 
@@ -21,12 +28,20 @@ export default function NotFound() {
           </CardHeader>
 
           <CardFooter class="justify-center gap-2">
-            <Button variant="secondary" class="gap-2 py-1" onClick={() => window.location.reload()}>
+            <Button
+              variant="secondary"
+              class="gap-2 py-1"
+              onClick={() => window.location.reload()}
+            >
               <RefreshCw size={18} />
               <span>Refresh</span>
             </Button>
 
-            <Button variant="default" class="gap-2 py-1" onClick={() => window.location.href = "/"} >
+            <Button
+              variant="default"
+              class="gap-2 py-1"
+              onClick={() => (window.location.href = "/")}
+            >
               <ArrowLeft size={18} />
               <span>Back</span>
             </Button>

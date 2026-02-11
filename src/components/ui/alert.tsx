@@ -42,7 +42,7 @@ const Alert: Component<AlertProps> = (props) => {
       class={cn(
         "flex items-start gap-3 rounded-xl px-4 py-3.5",
         config().container,
-        local.class
+        local.class,
       )}
       {...others}
     >

@@ -25,7 +25,9 @@ export interface VideoCardProps {
 }
 
 const VideoCard: Component<VideoCardProps> = (props) => {
-  const [feedbackStatus, setFeedbackStatus] = createSignal<"positive" | "negative" | null>(null);
+  const [feedbackStatus, setFeedbackStatus] = createSignal<
+    "positive" | "negative" | null
+  >(null);
   const [isSubmitting, setIsSubmitting] = createSignal(false);
 
   // Load feedback status on mount
@@ -44,16 +46,20 @@ const VideoCard: Component<VideoCardProps> = (props) => {
     }
   });
 
-  const handleFeedback = async (action: "like" | "dislike", event: MouseEvent) => {
+  const handleFeedback = async (
+    action: "like" | "dislike",
+    event: MouseEvent,
+  ) => {
     event.preventDefault();
     event.stopPropagation();
 
     if (isSubmitting()) return;
 
     // If clicking the same button, remove feedback
-    const newAction = feedbackStatus() === (action === "like" ? "positive" : "negative")
-      ? "remove"
-      : action;
+    const newAction =
+      feedbackStatus() === (action === "like" ? "positive" : "negative")
+        ? "remove"
+        : action;
 
     setIsSubmitting(true);
     try {
@@ -63,7 +69,12 @@ const VideoCard: Component<VideoCardProps> = (props) => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          action: newAction === "remove" ? "remove" : newAction === "like" ? "like" : "dislike",
+          action:
+            newAction === "remove"
+              ? "remove"
+              : newAction === "like"
+                ? "like"
+                : "dislike",
           videoId: props.video.id,
           metadata: {
             title: props.video.title,
@@ -125,7 +136,6 @@ const VideoCard: Component<VideoCardProps> = (props) => {
     });
   };
 
-
   return (
     <Card class="overflow-hidden transition-shadow hover:shadow-apple-lg">
       <a
@@ -141,7 +151,10 @@ const VideoCard: Component<VideoCardProps> = (props) => {
             class="w-full h-full object-cover"
             loading="lazy"
           />
-          <Badge variant="default" class="absolute top-2 right-2 gap-1 bg-black/70 text-white">
+          <Badge
+            variant="default"
+            class="absolute top-2 right-2 gap-1 bg-black/70 text-white"
+          >
             <ExternalLink size={12} />
             <span>Watch</span>
           </Badge>
@@ -166,7 +179,10 @@ const VideoCard: Component<VideoCardProps> = (props) => {
         </CardContent>
       </a>
 
-      <div class="flex items-center gap-2 px-4 pb-4" onClick={(e) => e.stopPropagation()}>
+      <div
+        class="flex items-center gap-2 px-4 pb-4"
+        onClick={(e) => e.stopPropagation()}
+      >
         <Button
           type="button"
           variant={feedbackStatus() === "positive" ? "default" : "outline"}
@@ -175,7 +191,10 @@ const VideoCard: Component<VideoCardProps> = (props) => {
           disabled={isSubmitting()}
           class="flex-1 gap-1.5"
         >
-          <ThumbsUp size={16} class={feedbackStatus() === "positive" ? "fill-current" : ""} />
+          <ThumbsUp
+            size={16}
+            class={feedbackStatus() === "positive" ? "fill-current" : ""}
+          />
           Like
         </Button>
         <Button
@@ -186,7 +205,10 @@ const VideoCard: Component<VideoCardProps> = (props) => {
           disabled={isSubmitting()}
           class="flex-1 gap-1.5"
         >
-          <ThumbsDown size={16} class={feedbackStatus() === "negative" ? "fill-current" : ""} />
+          <ThumbsDown
+            size={16}
+            class={feedbackStatus() === "negative" ? "fill-current" : ""}
+          />
           Dislike
         </Button>
       </div>

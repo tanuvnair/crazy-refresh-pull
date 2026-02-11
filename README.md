@@ -107,8 +107,8 @@ Logistic regression (10 hand-crafted features) trained on positive/negative feed
 | `src/services/`        | Server-only: db.server (Prisma client), video-pool, youtube, apply-filters-rank, feedback, recommendation-model                            |
 | `src/db-repositories/` | Data access: videos, feedback, model                                                                                                       |
 | `src/components/`      | video-card, settings-dialog, client-logging, ui/                                                                                           |
-| `src/lib/`             | cookie, encryption (API key obfuscation), html-entities, logger (structured JSON logging), utils                                          |
-| `src/middleware/`      | Request/response logging with sensitive header redaction                                                                                    |
+| `src/lib/`             | cookie, encryption (API key obfuscation), html-entities, logger (structured JSON logging), utils                                           |
+| `src/middleware/`      | Request/response logging with sensitive header redaction                                                                                   |
 
 ## Environment variables
 
@@ -128,17 +128,17 @@ Logistic regression (10 hand-crafted features) trained on positive/negative feed
 
 ## API reference
 
-| Endpoint           | Method | Purpose                                                                                              |
-| ------------------ | ------ | ---------------------------------------------------------------------------------------------------- |
-| `/api/feed`        | GET    | Random recommendations from pool (limit, optional apiKey)                                            |
+| Endpoint           | Method | Purpose                                                                                                                                             |
+| ------------------ | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/api/feed`        | GET    | Random recommendations from pool (limit, optional apiKey)                                                                                           |
 | `/api/youtube`     | GET    | Search: pool-first then YouTube; query params q, apiKey, maxResults, maxPagesToSearch, maxTotalVideosToFetch, minVideoDurationSeconds, usePoolFirst |
-| `/api/pool`        | GET    | Pool status (count, updatedAt)                                                                       |
-| `/api/pool`        | POST   | Seed pool (body: apiKey, queries, maxPagesPerQuery)                                                  |
-| `/api/feedback`    | GET    | Feedback status for videoId or batch videoIds                                                        |
-| `/api/feedback`    | POST   | Like / dislike / remove (body: action, videoId, metadata)                                            |
-| `/api/add-video`   | POST   | Add video by URL as positive feedback (body: url, apiKey)                                            |
-| `/api/train-model` | GET    | Model status (available, positiveCount, negativeCount, trainedAt, positiveCountWhenTrained, negativeCountWhenTrained) |
-| `/api/train-model` | POST   | Train recommendation model on current feedback                                                       |
+| `/api/pool`        | GET    | Pool status (count, updatedAt)                                                                                                                      |
+| `/api/pool`        | POST   | Seed pool (body: apiKey, queries, maxPagesPerQuery)                                                                                                 |
+| `/api/feedback`    | GET    | Feedback status for videoId or batch videoIds                                                                                                       |
+| `/api/feedback`    | POST   | Like / dislike / remove (body: action, videoId, metadata)                                                                                           |
+| `/api/add-video`   | POST   | Add video by URL as positive feedback (body: url, apiKey)                                                                                           |
+| `/api/train-model` | GET    | Model status (available, positiveCount, negativeCount, trainedAt, positiveCountWhenTrained, negativeCountWhenTrained)                               |
+| `/api/train-model` | POST   | Train recommendation model on current feedback                                                                                                      |
 
 ## YouTube API quota
 

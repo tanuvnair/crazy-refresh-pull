@@ -9,7 +9,12 @@ export interface SettingsSectionProps {
 }
 
 export const SettingsSection: Component<SettingsSectionProps> = (props) => (
-  <p class={cn("text-xs font-medium uppercase tracking-wider text-muted-foreground pt-4 first:pt-2", props.class)}>
+  <p
+    class={cn(
+      "text-xs font-medium uppercase tracking-wider text-muted-foreground pt-4 first:pt-2",
+      props.class,
+    )}
+  >
     {props.children}
   </p>
 );
@@ -22,7 +27,12 @@ export interface SettingsGroupProps {
 }
 
 export const SettingsGroup: Component<SettingsGroupProps> = (props) => (
-  <div class={cn("rounded-lg border border-border bg-background overflow-hidden", props.class)}>
+  <div
+    class={cn(
+      "rounded-lg border border-border bg-background overflow-hidden",
+      props.class,
+    )}
+  >
     {props.children}
   </div>
 );
@@ -46,11 +56,13 @@ export const SettingsRow: Component<SettingsRowProps> = (props) => {
   const showBorder = () => props.border !== false;
 
   return (
-    <div class={cn(
-      "flex items-center justify-between px-4 py-3",
-      showBorder() && "border-b border-border",
-      props.class
-    )}>
+    <div
+      class={cn(
+        "flex items-center justify-between px-4 py-3",
+        showBorder() && "border-b border-border",
+        props.class,
+      )}
+    >
       <div class="flex flex-col gap-0.5 min-w-0 mr-3">
         <span class="text-sm">{props.label}</span>
         {props.description && (
@@ -77,15 +89,19 @@ export interface SettingsContentRowProps {
   children: JSX.Element;
 }
 
-export const SettingsContentRow: Component<SettingsContentRowProps> = (props) => {
+export const SettingsContentRow: Component<SettingsContentRowProps> = (
+  props,
+) => {
   const showBorder = () => props.border !== false;
 
   return (
-    <div class={cn(
-      "flex flex-col gap-2 px-4 py-3",
-      showBorder() && "border-b border-border",
-      props.class
-    )}>
+    <div
+      class={cn(
+        "flex flex-col gap-2 px-4 py-3",
+        showBorder() && "border-b border-border",
+        props.class,
+      )}
+    >
       <span class="text-sm">{props.label}</span>
       {props.children}
       {props.description && (

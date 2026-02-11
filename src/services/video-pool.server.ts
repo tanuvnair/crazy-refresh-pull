@@ -110,7 +110,9 @@ export async function searchPool(
 /**
  * Get random recommendations from the pool. Excludes feedback and ranks with the learned model when available.
  */
-export async function getRandomRecommendations(limit: number): Promise<Video[]> {
+export async function getRandomRecommendations(
+  limit: number,
+): Promise<Video[]> {
   const candidateLimit = Math.min(limit * 3, 300);
   const rows = await videosRepo.findRandom(candidateLimit);
   const candidates = rows.map(rowToVideo);

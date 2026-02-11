@@ -28,14 +28,20 @@
   --radius-md: 0.5rem;
   --radius-sm: 0.375rem;
 
-  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "system-ui", sans-serif;
+  --font-sans:
+    "Inter", -apple-system, BlinkMacSystemFont, "system-ui", sans-serif;
 
-  --shadow-apple: 0 2px 8px 0 rgba(0, 0, 0, 0.08), 0 1px 4px 0 rgba(0, 0, 0, 0.04);
-  --shadow-apple-lg: 0 4px 16px 0 rgba(0, 0, 0, 0.1), 0 2px 8px 0 rgba(0, 0, 0, 0.06);
-  --shadow-apple-xl: 0 8px 24px 0 rgba(0, 0, 0, 0.12), 0 4px 12px 0 rgba(0, 0, 0, 0.08);
+  --shadow-apple:
+    0 2px 8px 0 rgba(0, 0, 0, 0.08), 0 1px 4px 0 rgba(0, 0, 0, 0.04);
+  --shadow-apple-lg:
+    0 4px 16px 0 rgba(0, 0, 0, 0.1), 0 2px 8px 0 rgba(0, 0, 0, 0.06);
+  --shadow-apple-xl:
+    0 8px 24px 0 rgba(0, 0, 0, 0.12), 0 4px 12px 0 rgba(0, 0, 0, 0.08);
   --shadow-apple-sm: 0 1px 4px 0 rgba(0, 0, 0, 0.06);
-  --shadow-apple-button: 0 1px 3px 0 rgba(0, 0, 0, 0.12), inset 0 1px 0 0 rgba(255, 255, 255, 0.15);
-  --shadow-apple-button-hover: 0 2px 6px 0 rgba(0, 0, 0, 0.15), inset 0 1px 0 0 rgba(255, 255, 255, 0.2);
+  --shadow-apple-button:
+    0 1px 3px 0 rgba(0, 0, 0, 0.12), inset 0 1px 0 0 rgba(255, 255, 255, 0.15);
+  --shadow-apple-button-hover:
+    0 2px 6px 0 rgba(0, 0, 0, 0.15), inset 0 1px 0 0 rgba(255, 255, 255, 0.2);
 }
 
 @layer base {
@@ -87,14 +93,26 @@
   }
 
   html {
-    font-family: "Inter", -apple-system, BlinkMacSystemFont, "system-ui", sans-serif;
+    font-family:
+      "Inter",
+      -apple-system,
+      BlinkMacSystemFont,
+      "system-ui",
+      sans-serif;
   }
 
   body {
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
-    font-family: "Inter", -apple-system, BlinkMacSystemFont, "system-ui", sans-serif;
-    font-feature-settings: "rlig" 1, "calt" 1;
+    font-family:
+      "Inter",
+      -apple-system,
+      BlinkMacSystemFont,
+      "system-ui",
+      sans-serif;
+    font-feature-settings:
+      "rlig" 1,
+      "calt" 1;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -138,11 +156,13 @@
 
   /* Webkit (Chrome, Safari, Edge) */
   input[type="range"].slider-with-fill::-webkit-slider-track {
-    background: linear-gradient(to right,
-        hsl(var(--primary)) 0%,
-        hsl(var(--primary)) var(--fill-percentage),
-        hsl(var(--input)) var(--fill-percentage),
-        hsl(var(--input)) 100%);
+    background: linear-gradient(
+      to right,
+      hsl(var(--primary)) 0%,
+      hsl(var(--primary)) var(--fill-percentage),
+      hsl(var(--input)) var(--fill-percentage),
+      hsl(var(--input)) 100%
+    );
     @apply h-1.5 rounded;
   }
 
@@ -172,11 +192,13 @@
 
   /* Firefox */
   input[type="range"].slider-with-fill::-moz-range-track {
-    background: linear-gradient(to right,
-        hsl(var(--primary)) 0%,
-        hsl(var(--primary)) var(--fill-percentage),
-        hsl(var(--input)) var(--fill-percentage),
-        hsl(var(--input)) 100%);
+    background: linear-gradient(
+      to right,
+      hsl(var(--primary)) 0%,
+      hsl(var(--primary)) var(--fill-percentage),
+      hsl(var(--input)) var(--fill-percentage),
+      hsl(var(--input)) 100%
+    );
     @apply h-1.5 rounded border-0;
   }
 
@@ -214,20 +236,40 @@
 
   /* Dialog animations (shadcn-style: data-state open/closed) */
   @keyframes dialog-overlay-in {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
   }
   @keyframes dialog-overlay-out {
-    from { opacity: 1; }
-    to { opacity: 0; }
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
   }
   @keyframes dialog-content-in {
-    from { opacity: 0; transform: scale(0.95); }
-    to { opacity: 1; transform: scale(1); }
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
   }
   @keyframes dialog-content-out {
-    from { opacity: 1; transform: scale(1); }
-    to { opacity: 0; transform: scale(0.95); }
+    from {
+      opacity: 1;
+      transform: scale(1);
+    }
+    to {
+      opacity: 0;
+      transform: scale(0.95);
+    }
   }
   .dialog-overlay[data-state="closed"] {
     opacity: 0;

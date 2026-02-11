@@ -3,7 +3,10 @@
  * Outputs JSON with timestamp, level, source (server|client), message, and optional meta.
  */
 
-const SOURCE = typeof import.meta !== "undefined" && import.meta.env?.SSR ? "server" : "client";
+const SOURCE =
+  typeof import.meta !== "undefined" && import.meta.env?.SSR
+    ? "server"
+    : "client";
 
 function timestamp(): string {
   return new Date().toISOString();
@@ -11,7 +14,8 @@ function timestamp(): string {
 
 function serializeMeta(meta: unknown): Record<string, unknown> {
   if (meta === undefined || meta === null) return {};
-  if (typeof meta === "object" && !Array.isArray(meta)) return meta as Record<string, unknown>;
+  if (typeof meta === "object" && !Array.isArray(meta))
+    return meta as Record<string, unknown>;
   return { value: meta };
 }
 

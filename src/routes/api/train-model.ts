@@ -45,7 +45,7 @@ export async function POST(_event: APIEvent) {
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 }
@@ -69,7 +69,7 @@ export async function GET(_event: APIEvent) {
       {
         status: 200,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
@@ -82,7 +82,7 @@ export async function GET(_event: APIEvent) {
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 }

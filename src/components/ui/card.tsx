@@ -1,7 +1,7 @@
 import { Component, JSX, splitProps } from "solid-js";
 import { cn } from "~/lib/utils";
 
-export interface CardProps extends JSX.HTMLAttributes<HTMLDivElement> { }
+export interface CardProps extends JSX.HTMLAttributes<HTMLDivElement> {}
 
 const Card: Component<CardProps> = (props) => {
   const [local, others] = splitProps(props, ["class", "children"]);
@@ -10,7 +10,7 @@ const Card: Component<CardProps> = (props) => {
     <div
       class={cn(
         "rounded-2xl border border-border bg-card text-card-foreground shadow-apple p-4",
-        local.class
+        local.class,
       )}
       {...others}
     >
@@ -19,7 +19,7 @@ const Card: Component<CardProps> = (props) => {
   );
 };
 
-export interface CardHeaderProps extends JSX.HTMLAttributes<HTMLDivElement> { }
+export interface CardHeaderProps extends JSX.HTMLAttributes<HTMLDivElement> {}
 
 const CardHeader: Component<CardHeaderProps> = (props) => {
   const [local, others] = splitProps(props, ["class", "children"]);
@@ -34,29 +34,29 @@ const CardHeader: Component<CardHeaderProps> = (props) => {
   );
 };
 
-export interface CardTitleProps extends JSX.HTMLAttributes<HTMLHeadingElement> { }
+export interface CardTitleProps extends JSX.HTMLAttributes<HTMLHeadingElement> {}
 
 const CardTitle: Component<CardTitleProps> = (props) => {
   const [local, others] = splitProps(props, ["class", "children"]);
 
   return (
-    <h3
-      class={cn("text-2xl font-semibold leading-8", local.class)}
-      {...others}
-    >
+    <h3 class={cn("text-2xl font-semibold leading-8", local.class)} {...others}>
       {local.children}
     </h3>
   );
 };
 
-export interface CardDescriptionProps extends JSX.HTMLAttributes<HTMLParagraphElement> { }
+export interface CardDescriptionProps extends JSX.HTMLAttributes<HTMLParagraphElement> {}
 
 const CardDescription: Component<CardDescriptionProps> = (props) => {
   const [local, others] = splitProps(props, ["class", "children"]);
 
   return (
     <p
-      class={cn("text-base font-normal leading-6 text-muted-foreground", local.class)}
+      class={cn(
+        "text-base font-normal leading-6 text-muted-foreground",
+        local.class,
+      )}
       {...others}
     >
       {local.children}
@@ -64,7 +64,7 @@ const CardDescription: Component<CardDescriptionProps> = (props) => {
   );
 };
 
-export interface CardContentProps extends JSX.HTMLAttributes<HTMLDivElement> { }
+export interface CardContentProps extends JSX.HTMLAttributes<HTMLDivElement> {}
 
 const CardContent: Component<CardContentProps> = (props) => {
   const [local, others] = splitProps(props, ["class", "children"]);
@@ -79,7 +79,7 @@ const CardContent: Component<CardContentProps> = (props) => {
   );
 };
 
-export interface CardFooterProps extends JSX.HTMLAttributes<HTMLDivElement> { }
+export interface CardFooterProps extends JSX.HTMLAttributes<HTMLDivElement> {}
 
 const CardFooter: Component<CardFooterProps> = (props) => {
   const [local, others] = splitProps(props, ["class", "children"]);

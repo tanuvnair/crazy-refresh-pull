@@ -42,7 +42,7 @@ export default createMiddleware({
 
   onBeforeResponse(
     event: FetchEvent,
-    _responseParam: { body?: unknown }
+    _responseParam: { body?: unknown },
   ): void {
     const startTime = (event.locals as { startTime?: number }).startTime;
     const durationMs =

@@ -1,4 +1,11 @@
-import { Component, JSX, createEffect, onCleanup, createSignal, Show } from "solid-js";
+import {
+  Component,
+  JSX,
+  createEffect,
+  onCleanup,
+  createSignal,
+  Show,
+} from "solid-js";
 import { Portal } from "solid-js/web";
 import { cn } from "~/lib/utils";
 
@@ -128,7 +135,7 @@ const DialogContent: Component<DialogContentProps> = (props) => (
   <div
     class={cn(
       "flex w-full flex-col sm:w-lg sm:max-w-lg max-h-[85vh] rounded-lg border border-border bg-card text-card-foreground shadow-apple-xl",
-      props.class
+      props.class,
     )}
   >
     {props.children}
@@ -136,7 +143,12 @@ const DialogContent: Component<DialogContentProps> = (props) => (
 );
 
 const DialogHeader: Component<DialogHeaderProps> = (props) => (
-  <div class={cn("sticky top-0 z-10 flex flex-col gap-1.5 border-b border-border bg-card px-6 pt-6 pb-4 rounded-t-lg", props.class)}>
+  <div
+    class={cn(
+      "sticky top-0 z-10 flex flex-col gap-1.5 border-b border-border bg-card px-6 pt-6 pb-4 rounded-t-lg",
+      props.class,
+    )}
+  >
     {props.children}
   </div>
 );
@@ -148,18 +160,34 @@ const DialogBody: Component<DialogBodyProps> = (props) => (
 );
 
 const DialogFooter: Component<DialogFooterProps> = (props) => (
-  <div class={cn("sticky bottom-0 z-10 flex items-center justify-end border-t border-border bg-card px-6 py-4 rounded-b-lg", props.class)}>
+  <div
+    class={cn(
+      "sticky bottom-0 z-10 flex items-center justify-end border-t border-border bg-card px-6 py-4 rounded-b-lg",
+      props.class,
+    )}
+  >
     {props.children}
   </div>
 );
 
 const DialogTitle: Component<DialogTitleProps> = (props) => (
-  <h2 class={cn("text-lg font-semibold leading-none", props.class)}>{props.children}</h2>
+  <h2 class={cn("text-lg font-semibold leading-none", props.class)}>
+    {props.children}
+  </h2>
 );
 
 const DialogDescription: Component<DialogDescriptionProps> = (props) => (
-  <p class={cn("text-sm text-muted-foreground", props.class)}>{props.children}</p>
+  <p class={cn("text-sm text-muted-foreground", props.class)}>
+    {props.children}
+  </p>
 );
 
 export default Dialog;
-export { DialogContent, DialogHeader, DialogBody, DialogFooter, DialogTitle, DialogDescription };
+export {
+  DialogContent,
+  DialogHeader,
+  DialogBody,
+  DialogFooter,
+  DialogTitle,
+  DialogDescription,
+};

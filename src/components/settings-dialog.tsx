@@ -52,7 +52,10 @@ export interface SettingsDialogProps {
   onClearYoutubeApiKey: () => void;
   searchLoading: boolean;
   filterSettings: FilterSettingsShape;
-  onFilterSettingsChange: (key: keyof FilterSettingsShape, value: number) => void;
+  onFilterSettingsChange: (
+    key: keyof FilterSettingsShape,
+    value: number,
+  ) => void;
   favoriteVideoUrl: string;
   onFavoriteVideoUrlChange: (value: string) => void;
   addingFavorite: boolean;
@@ -104,7 +107,9 @@ export default function SettingsDialog(props: SettingsDialogProps) {
                   placeholder="Paste key here..."
                   class="h-8 text-sm text-right bg-transparent border-0 shadow-none focus:ring-0 min-w-0"
                   value={props.youtubeApiKey}
-                  onInput={(e) => props.onYoutubeApiKeyChange(e.currentTarget.value)}
+                  onInput={(e) =>
+                    props.onYoutubeApiKeyChange(e.currentTarget.value)
+                  }
                   disabled={props.searchLoading}
                 />
                 <Button
@@ -112,7 +117,9 @@ export default function SettingsDialog(props: SettingsDialogProps) {
                   variant="ghost"
                   size="icon"
                   class="h-7 w-7 shrink-0"
-                  onClick={() => props.onShowYoutubeApiKeyChange(!props.showYoutubeApiKey)}
+                  onClick={() =>
+                    props.onShowYoutubeApiKeyChange(!props.showYoutubeApiKey)
+                  }
                   title={props.showYoutubeApiKey ? "Hide" : "Show"}
                 >
                   {props.showYoutubeApiKey ? (
@@ -169,7 +176,9 @@ export default function SettingsDialog(props: SettingsDialogProps) {
                     size={14}
                     class={cn(
                       "shrink-0 overflow-hidden transition-all duration-300 ease-out",
-                      saveSuccess() ? "w-3.5 mr-1 opacity-100" : "w-0 mr-0 opacity-0"
+                      saveSuccess()
+                        ? "w-3.5 mr-1 opacity-100"
+                        : "w-0 mr-0 opacity-0",
                     )}
                   />
                   Save
@@ -195,7 +204,7 @@ export default function SettingsDialog(props: SettingsDialogProps) {
                   const v = parseInt(e.currentTarget.value, 10) || 20;
                   props.onFilterSettingsChange(
                     "maxPagesToSearch",
-                    Math.max(1, Math.min(v, 95))
+                    Math.max(1, Math.min(v, 95)),
                   );
                 }}
                 disabled={props.searchLoading}
@@ -217,7 +226,7 @@ export default function SettingsDialog(props: SettingsDialogProps) {
                   const v = parseInt(e.currentTarget.value, 10) || 1000;
                   props.onFilterSettingsChange(
                     "maxTotalVideosToFetch",
-                    Math.max(50, Math.min(v, 4750))
+                    Math.max(50, Math.min(v, 4750)),
                   );
                 }}
                 disabled={props.searchLoading}
@@ -240,7 +249,7 @@ export default function SettingsDialog(props: SettingsDialogProps) {
                   const v = parseInt(e.currentTarget.value, 10) || 60;
                   props.onFilterSettingsChange(
                     "minVideoDurationSeconds",
-                    Math.max(0, Math.min(v, 600))
+                    Math.max(0, Math.min(v, 600)),
                   );
                 }}
                 disabled={props.searchLoading}
@@ -362,7 +371,7 @@ export default function SettingsDialog(props: SettingsDialogProps) {
                   value={props.poolPagesPerQuery}
                   onInput={(e) =>
                     props.onPoolPagesPerQueryChange(
-                      parseInt(e.currentTarget.value, 10) || 2
+                      parseInt(e.currentTarget.value, 10) || 2,
                     )
                   }
                   disabled={props.seedingPool || props.searchLoading}

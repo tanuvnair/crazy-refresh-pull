@@ -1,7 +1,7 @@
 import { Component, JSX, splitProps } from "solid-js";
 import { cn } from "~/lib/utils";
 
-export interface InputProps extends JSX.InputHTMLAttributes<HTMLInputElement> { }
+export interface InputProps extends JSX.InputHTMLAttributes<HTMLInputElement> {}
 
 const Input: Component<InputProps> = (props) => {
   const [local, others] = splitProps(props, ["class", "type"]);
@@ -15,7 +15,7 @@ const Input: Component<InputProps> = (props) => {
         "placeholder:text-muted-foreground placeholder:font-normal",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:border-primary/60",
         "disabled:cursor-not-allowed disabled:opacity-50",
-        local.class
+        local.class,
       )}
       {...others}
     />

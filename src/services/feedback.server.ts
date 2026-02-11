@@ -39,7 +39,10 @@ function rowsToMetadataMap(rows: FeedbackRow[]): Map<string, VideoMetadata> {
  * Add a video with metadata to positive feedback.
  * Removes it from negative if present (upsert replaces the row).
  */
-export async function addPositiveFeedback(videoId: string, metadata?: Partial<VideoMetadata>): Promise<void> {
+export async function addPositiveFeedback(
+  videoId: string,
+  metadata?: Partial<VideoMetadata>,
+): Promise<void> {
   if (!videoId || videoId.trim().length === 0) {
     throw new Error("Video ID is required");
   }
@@ -60,7 +63,10 @@ export async function addPositiveFeedback(videoId: string, metadata?: Partial<Vi
  * Add a video with metadata to negative feedback.
  * Removes it from positive if present (upsert replaces the row).
  */
-export async function addNegativeFeedback(videoId: string, metadata?: Partial<VideoMetadata>): Promise<void> {
+export async function addNegativeFeedback(
+  videoId: string,
+  metadata?: Partial<VideoMetadata>,
+): Promise<void> {
   if (!videoId || videoId.trim().length === 0) {
     throw new Error("Video ID is required");
   }
@@ -106,14 +112,18 @@ export async function getNegativeFeedback(): Promise<Set<string>> {
 /**
  * Get all positive feedback with metadata.
  */
-export async function getPositiveFeedbackWithMetadata(): Promise<Map<string, VideoMetadata>> {
+export async function getPositiveFeedbackWithMetadata(): Promise<
+  Map<string, VideoMetadata>
+> {
   return rowsToMetadataMap(await feedbackRepo.findBySentiment("positive"));
 }
 
 /**
  * Get all negative feedback with metadata.
  */
-export async function getNegativeFeedbackWithMetadata(): Promise<Map<string, VideoMetadata>> {
+export async function getNegativeFeedbackWithMetadata(): Promise<
+  Map<string, VideoMetadata>
+> {
   return rowsToMetadataMap(await feedbackRepo.findBySentiment("negative"));
 }
 
@@ -143,7 +153,9 @@ export async function getFeedbackSummary(): Promise<{
 /**
  * Get feedback status for a specific video.
  */
-export async function getVideoFeedbackStatus(videoId: string): Promise<"positive" | "negative" | null> {
+export async function getVideoFeedbackStatus(
+  videoId: string,
+): Promise<"positive" | "negative" | null> {
   return await feedbackRepo.findSentimentById(videoId);
 }
 
@@ -151,7 +163,7 @@ export async function getVideoFeedbackStatus(videoId: string): Promise<"positive
  * Get feedback status for multiple videos at once (batch operation).
  */
 export async function getBatchVideoFeedbackStatus(
-  videoIds: string[]
+  videoIds: string[],
 ): Promise<Map<string, "positive" | "negative" | null>> {
   return await feedbackRepo.findSentimentsByIds(videoIds);
 }

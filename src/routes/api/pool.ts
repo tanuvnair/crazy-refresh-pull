@@ -20,7 +20,7 @@ export async function GET(_event: APIEvent) {
     log.error("pool GET: failed", { message });
     return new Response(
       JSON.stringify({ error: "Failed to get pool status", message }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
+      { status: 500, headers: { "Content-Type": "application/json" } },
     );
   }
 }
@@ -40,7 +40,7 @@ export async function POST(event: APIEvent) {
       log.warn("pool POST: invalid content type");
       return new Response(
         JSON.stringify({ error: "Content-Type must be application/json" }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
+        { status: 400, headers: { "Content-Type": "application/json" } },
       );
     }
     const body = (await event.request.json()) as {
@@ -52,21 +52,23 @@ export async function POST(event: APIEvent) {
     const rawQueries = body.queries;
     const maxPagesPerQuery = Math.min(
       MAX_PAGES_PER_QUERY,
-      Math.max(1, body.maxPagesPerQuery ?? 2)
+      Math.max(1, body.maxPagesPerQuery ?? 2),
     );
 
     if (!apiKey) {
       log.warn("pool POST: missing apiKey");
-      return new Response(
-        JSON.stringify({ error: "apiKey is required" }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "apiKey is required" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
     }
     if (!Array.isArray(rawQueries) || rawQueries.length === 0) {
       log.warn("pool POST: invalid or empty queries");
       return new Response(
-        JSON.stringify({ error: "queries must be a non-empty array of strings" }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
+        JSON.stringify({
+          error: "queries must be a non-empty array of strings",
+        }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
       );
     }
     const queries = rawQueries
@@ -78,7 +80,7 @@ export async function POST(event: APIEvent) {
       log.warn("pool POST: no valid queries after filter");
       return new Response(
         JSON.stringify({ error: "At least one non-empty query is required" }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
+        { status: 400, headers: { "Content-Type": "application/json" } },
       );
     }
 
@@ -95,7 +97,7 @@ export async function POST(event: APIEvent) {
           50,
           50,
           nextPageToken,
-          60
+          60,
         );
         allVideos.push(...result.videos);
         nextPageToken = result.nextPageToken;
@@ -123,7 +125,7 @@ export async function POST(event: APIEvent) {
         poolTotal: total,
         poolAdded: added,
       }),
-      { status: 200, headers: { "Content-Type": "application/json" } }
+      { status: 200, headers: { "Content-Type": "application/json" } },
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
@@ -133,7 +135,7 @@ export async function POST(event: APIEvent) {
         error: "Failed to seed pool",
         message,
       }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
+      { status: 500, headers: { "Content-Type": "application/json" } },
     );
   }
 }

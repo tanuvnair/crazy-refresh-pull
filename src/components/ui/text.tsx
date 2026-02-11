@@ -2,12 +2,25 @@ import { children, Component, JSX, splitProps } from "solid-js";
 import { cn } from "~/lib/utils";
 
 export interface TextProps extends JSX.HTMLAttributes<HTMLParagraphElement> {
-  variant?: "body" | "caption" | "footnote" | "headline" | "subheadline" | "title1" | "title2" | "title3";
+  variant?:
+    | "body"
+    | "caption"
+    | "footnote"
+    | "headline"
+    | "subheadline"
+    | "title1"
+    | "title2"
+    | "title3";
   muted?: boolean;
 }
 
 const Text: Component<TextProps> = (props) => {
-  const [local, others] = splitProps(props, ["variant", "muted", "class", "children"]);
+  const [local, others] = splitProps(props, [
+    "variant",
+    "muted",
+    "class",
+    "children",
+  ]);
   const resolved = children(() => local.children);
 
   const variantClasses = {
@@ -26,7 +39,7 @@ const Text: Component<TextProps> = (props) => {
       class={cn(
         variantClasses[local.variant || "body"],
         local.muted && "text-muted-foreground",
-        local.class
+        local.class,
       )}
       {...others}
     >

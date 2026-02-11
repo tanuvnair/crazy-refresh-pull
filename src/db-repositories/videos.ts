@@ -120,7 +120,7 @@ export async function findNewest(limit: number): Promise<VideoRow[]> {
 
 /** All video columns for raw queries. */
 const VIDEO_COLUMNS = Prisma.raw(
-  `id, title, description, thumbnail, "channelTitle", "publishedAt", "viewCount", "likeCount", url, "createdAt"`
+  `id, title, description, thumbnail, "channelTitle", "publishedAt", "viewCount", "likeCount", url, "createdAt"`,
 );
 
 /**

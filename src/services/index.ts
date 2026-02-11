@@ -1,4 +1,7 @@
-export { searchYouTubeVideos, searchVideosWithFiltering } from "./youtube.server";
+export {
+  searchYouTubeVideos,
+  searchVideosWithFiltering,
+} from "./youtube.server";
 export type { SearchVideosOptions, SearchVideosResult } from "./youtube.server";
 export {
   trainModel,
@@ -8,4 +11,7 @@ export {
   invalidateModelCache,
   extractFeatures,
 } from "./recommendation-model.server";
-export type { RecommendationModelData, VideoLike } from "./recommendation-model.server";
+export type {
+  RecommendationModelData,
+  VideoLike,
+} from "./recommendation-model.server";

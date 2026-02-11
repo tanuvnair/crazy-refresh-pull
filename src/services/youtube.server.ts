@@ -180,7 +180,10 @@ export async function searchYouTubeVideos(
         }
       } catch (parseError) {
         log.warn("youtube: failed to parse video details response", {
-          message: parseError instanceof Error ? parseError.message : String(parseError),
+          message:
+            parseError instanceof Error
+              ? parseError.message
+              : String(parseError),
         });
         detailsData = { items: [] };
       }
@@ -550,7 +553,10 @@ export async function searchVideosWithFiltering(
       );
     } catch (feedbackError) {
       log.warn("youtube: failed to load feedback for repeat filtering", {
-        message: feedbackError instanceof Error ? feedbackError.message : String(feedbackError),
+        message:
+          feedbackError instanceof Error
+            ? feedbackError.message
+            : String(feedbackError),
       });
       // Continue without repeat filtering if it fails
     }
@@ -600,7 +606,10 @@ export async function searchVideosWithFiltering(
     }
   } catch (recommendationError) {
     log.warn("youtube: recommendation model ranking skipped", {
-      message: recommendationError instanceof Error ? recommendationError.message : String(recommendationError),
+      message:
+        recommendationError instanceof Error
+          ? recommendationError.message
+          : String(recommendationError),
     });
   }
 

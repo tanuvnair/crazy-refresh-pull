@@ -6,23 +6,27 @@ const COOKIE_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
  */
 export function getCookie(name: string): string | null {
   if (typeof document === "undefined") return null;
-  
+
   const value = `; ${document.cookie}`;
   const parts = value.split(`; ${name}=`);
-  
+
   if (parts.length === 2) {
     return parts.pop()?.split(";").shift() || null;
   }
-  
+
   return null;
 }
 
 /**
  * Set a cookie
  */
-export function setCookie(name: string, value: string, maxAge: number = COOKIE_MAX_AGE): void {
+export function setCookie(
+  name: string,
+  value: string,
+  maxAge: number = COOKIE_MAX_AGE,
+): void {
   if (typeof document === "undefined") return;
-  
+
   document.cookie = `${name}=${value}; max-age=${maxAge}; path=/; SameSite=Lax`;
 }
 
@@ -31,7 +35,7 @@ export function setCookie(name: string, value: string, maxAge: number = COOKIE_M
  */
 export function deleteCookie(name: string): void {
   if (typeof document === "undefined") return;
-  
+
   document.cookie = `${name}=; max-age=0; path=/; SameSite=Lax`;
 }
 
@@ -52,4 +56,3 @@ export function saveYouTubeApiKeyToCookie(encrypted: string): void {
     deleteCookie(YOUTUBE_COOKIE_NAME);
   }
 }
-

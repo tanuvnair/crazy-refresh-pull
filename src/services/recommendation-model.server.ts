@@ -51,10 +51,42 @@ function extractKeywords(text: string): string[] {
   const words = lowerText.split(/\s+/);
   const keywords: string[] = [];
   const stopWords = new Set([
-    "the", "and", "or", "but", "in", "on", "at", "to", "for", "of",
-    "with", "by", "a", "an", "is", "are", "was", "were", "be", "been",
-    "have", "has", "had", "do", "does", "did", "will", "would", "could",
-    "should", "may", "might", "this", "that", "these", "those",
+    "the",
+    "and",
+    "or",
+    "but",
+    "in",
+    "on",
+    "at",
+    "to",
+    "for",
+    "of",
+    "with",
+    "by",
+    "a",
+    "an",
+    "is",
+    "are",
+    "was",
+    "were",
+    "be",
+    "been",
+    "have",
+    "has",
+    "had",
+    "do",
+    "does",
+    "did",
+    "will",
+    "would",
+    "could",
+    "should",
+    "may",
+    "might",
+    "this",
+    "that",
+    "these",
+    "those",
   ]);
   for (const word of words) {
     const cleanWord = word.replace(/[^\w]/g, "");
@@ -74,10 +106,20 @@ function detectClickbait(title: string): number {
   const emojiCount = (title.match(/[\u{1F300}-\u{1F9FF}]/gu) || []).length;
   if (emojiCount > 2) clickbaitScore += 0.2;
   const clickbaitPhrases = [
-    "you won't believe", "this will shock you", "number one will",
-    "top 10", "watch until the end", "gone wrong", "gone sexual",
-    "they don't want you to know", "doctors hate this", "one weird trick",
-    "click here", "subscribe now", "like and subscribe", "smash that like button",
+    "you won't believe",
+    "this will shock you",
+    "number one will",
+    "top 10",
+    "watch until the end",
+    "gone wrong",
+    "gone sexual",
+    "they don't want you to know",
+    "doctors hate this",
+    "one weird trick",
+    "click here",
+    "subscribe now",
+    "like and subscribe",
+    "smash that like button",
   ];
   for (const phrase of clickbaitPhrases) {
     if (lowerTitle.includes(phrase)) clickbaitScore += 0.2;
@@ -88,7 +130,10 @@ function detectClickbait(title: string): number {
   return Math.min(clickbaitScore, 1.0);
 }
 
-function calculateEngagementScore(viewCount?: string, likeCount?: string): number {
+function calculateEngagementScore(
+  viewCount?: string,
+  likeCount?: string,
+): number {
   if (!viewCount || !likeCount) return 0.5;
   const views = parseInt(viewCount, 10);
   const likes = parseInt(likeCount, 10);
@@ -105,7 +150,11 @@ function analyzeDescriptionQuality(description: string): number {
   const desc = description.toLowerCase();
   let score = 0.5;
   if (description.length > 200) score += 0.1;
-  if (desc.includes("subscribe") && desc.includes("like") && desc.includes("notification")) {
+  if (
+    desc.includes("subscribe") &&
+    desc.includes("like") &&
+    desc.includes("notification")
+  ) {
     score -= 0.2;
   }
   const linkCount = (description.match(/https?:\/\//g) || []).length;
@@ -130,16 +179,25 @@ async function loadFeedbackPatterns(): Promise<FeedbackPatterns> {
   const positiveChannels = new Set<string>();
   const negativeChannels = new Set<string>();
   for (const m of positive.values()) {
-    if (m.title) extractKeywords(m.title).forEach((k) => positiveKeywords.add(k));
-    if (m.description) extractKeywords(m.description).forEach((k) => positiveKeywords.add(k));
+    if (m.title)
+      extractKeywords(m.title).forEach((k) => positiveKeywords.add(k));
+    if (m.description)
+      extractKeywords(m.description).forEach((k) => positiveKeywords.add(k));
     if (m.channelTitle) positiveChannels.add(m.channelTitle);
   }
   for (const m of negative.values()) {
-    if (m.title) extractKeywords(m.title).forEach((k) => negativeKeywords.add(k));
-    if (m.description) extractKeywords(m.description).forEach((k) => negativeKeywords.add(k));
+    if (m.title)
+      extractKeywords(m.title).forEach((k) => negativeKeywords.add(k));
+    if (m.description)
+      extractKeywords(m.description).forEach((k) => negativeKeywords.add(k));
     if (m.channelTitle) negativeChannels.add(m.channelTitle);
   }
-  return { positiveKeywords, negativeKeywords, positiveChannels, negativeChannels };
+  return {
+    positiveKeywords,
+    negativeKeywords,
+    positiveChannels,
+    negativeChannels,
+  };
 }
 
 // ---------- feature extraction ----------
@@ -149,7 +207,7 @@ async function loadFeedbackPatterns(): Promise<FeedbackPatterns> {
  */
 export async function extractFeatures(
   video: VideoLike,
-  patterns: FeedbackPatterns
+  patterns: FeedbackPatterns,
 ): Promise<number[]> {
   const title = (video.title ?? "").trim();
   const description = (video.description ?? "").trim();
@@ -175,8 +233,12 @@ export async function extractFeatures(
   const positiveKeywordOverlap = positiveOverlap / totalKeywords;
   const negativeKeywordOverlap = negativeOverlap / totalKeywords;
 
-  const positiveChannelMatch = patterns.positiveChannels.has(channelTitle) ? 1 : 0;
-  const negativeChannelMatch = patterns.negativeChannels.has(channelTitle) ? 1 : 0;
+  const positiveChannelMatch = patterns.positiveChannels.has(channelTitle)
+    ? 1
+    : 0;
+  const negativeChannelMatch = patterns.negativeChannels.has(channelTitle)
+    ? 1
+    : 0;
 
   let engagementLikeRatio = 0.5;
   if (video.viewCount && video.likeCount) {
@@ -220,7 +282,11 @@ async function loadModelFromDb(): Promise<RecommendationModelData | null> {
   if (!raw) return null;
   try {
     const data = JSON.parse(raw) as RecommendationModelData;
-    if (data.version !== 1 || !Array.isArray(data.weights) || data.weights.length !== FEATURE_COUNT) {
+    if (
+      data.version !== 1 ||
+      !Array.isArray(data.weights) ||
+      data.weights.length !== FEATURE_COUNT
+    ) {
       return null;
     }
     cachedModel = data;
@@ -250,7 +316,10 @@ export async function trainModel(): Promise<{
 
   const MIN_POSITIVE = 2;
   const MIN_NEGATIVE = 2;
-  if (positiveList.length < MIN_POSITIVE || negativeList.length < MIN_NEGATIVE) {
+  if (
+    positiveList.length < MIN_POSITIVE ||
+    negativeList.length < MIN_NEGATIVE
+  ) {
     return {
       success: false,
       message: `Need at least ${MIN_POSITIVE} positive and ${MIN_NEGATIVE} negative feedback samples to train. You have ${positiveList.length} positive and ${negativeList.length} negative.`,
@@ -289,7 +358,9 @@ export async function trainModel(): Promise<{
       }
       const pred = sigmoid(z);
       const err = pred - label;
-      totalLoss += label * Math.log(pred + 1e-15) + (1 - label) * Math.log(1 - pred + 1e-15);
+      totalLoss +=
+        label * Math.log(pred + 1e-15) +
+        (1 - label) * Math.log(1 - pred + 1e-15);
       gradB += err;
       for (let i = 0; i < numFeatures; i++) {
         gradW[i] += err * features[i];

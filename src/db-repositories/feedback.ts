@@ -49,7 +49,9 @@ export async function deleteById(id: string): Promise<void> {
 /**
  * Get all ids for a given sentiment.
  */
-export async function findIdsBySentiment(sentiment: Sentiment): Promise<string[]> {
+export async function findIdsBySentiment(
+  sentiment: Sentiment,
+): Promise<string[]> {
   const rows = await prisma.feedback.findMany({
     where: { sentiment },
     select: { id: true },
@@ -60,7 +62,9 @@ export async function findIdsBySentiment(sentiment: Sentiment): Promise<string[]
 /**
  * Get all rows for a given sentiment.
  */
-export async function findBySentiment(sentiment: Sentiment): Promise<FeedbackRow[]> {
+export async function findBySentiment(
+  sentiment: Sentiment,
+): Promise<FeedbackRow[]> {
   return prisma.feedback.findMany({ where: { sentiment } });
 }
 
@@ -79,7 +83,9 @@ export async function findSentimentById(id: string): Promise<Sentiment | null> {
 /**
  * Get the sentiment for multiple video ids at once.
  */
-export async function findSentimentsByIds(ids: string[]): Promise<Map<string, Sentiment | null>> {
+export async function findSentimentsByIds(
+  ids: string[],
+): Promise<Map<string, Sentiment | null>> {
   const result = new Map<string, Sentiment | null>();
   if (ids.length === 0) return result;
 

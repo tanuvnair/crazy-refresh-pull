@@ -20,7 +20,7 @@ const Badge: Component<BadgeProps> = (props) => {
       class={cn(
         "inline-flex items-center rounded-md px-2.5 py-1 text-xs font-medium leading-5 min-h-6",
         variantClasses[local.variant || "default"],
-        local.class
+        local.class,
       )}
       {...others}
     >

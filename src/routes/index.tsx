@@ -9,7 +9,10 @@ import Loader from "lucide-solid/icons/loader";
 import VideoCard, { type Video } from "~/components/video-card";
 import SettingsDialog from "~/components/settings-dialog";
 import { encryptApiKey, decryptApiKey } from "~/lib/encryption";
-import { getYouTubeApiKeyFromCookie, saveYouTubeApiKeyToCookie } from "~/lib/cookie";
+import {
+  getYouTubeApiKeyFromCookie,
+  saveYouTubeApiKeyToCookie,
+} from "~/lib/cookie";
 import { log } from "~/lib/logger";
 
 const YOUTUBE_API_KEY_STORAGE_KEY = "youtube_api_key_encrypted";
@@ -45,9 +48,14 @@ export default function Home() {
     trainedAt: string | null;
   } | null>(null);
   const [trainingModel, setTrainingModel] = createSignal(false);
-  const [poolStatus, setPoolStatus] = createSignal<{ count: number; updatedAt: string | null } | null>(null);
+  const [poolStatus, setPoolStatus] = createSignal<{
+    count: number;
+    updatedAt: string | null;
+  } | null>(null);
   const [seedingPool, setSeedingPool] = createSignal(false);
-  const [poolSeedQueries, setPoolSeedQueries] = createSignal("documentary, cooking, travel");
+  const [poolSeedQueries, setPoolSeedQueries] = createSignal(
+    "documentary, cooking, travel",
+  );
   const [poolPagesPerQuery, setPoolPagesPerQuery] = createSignal(2);
   // YouTube API quota limits:
   // - Default daily quota: 10,000 units
@@ -109,7 +117,10 @@ export default function Home() {
         const poolRes = await fetch("/api/pool");
         if (poolRes.ok) {
           const data = await poolRes.json();
-          setPoolStatus({ count: data.count ?? 0, updatedAt: data.updatedAt ?? null });
+          setPoolStatus({
+            count: data.count ?? 0,
+            updatedAt: data.updatedAt ?? null,
+          });
         }
       } catch {
         // Ignore
@@ -120,12 +131,24 @@ export default function Home() {
         try {
           const settings = JSON.parse(settingsJson) as Partial<FilterSettings>;
           const clampedSettings: FilterSettings = {
-            maxPagesToSearch: Math.min(Math.max(1, settings.maxPagesToSearch ?? 20), 95),
-            maxTotalVideosToFetch: Math.min(Math.max(50, settings.maxTotalVideosToFetch ?? 1000), 4750),
-            minVideoDurationSeconds: Math.min(Math.max(0, settings.minVideoDurationSeconds ?? 60), 600),
+            maxPagesToSearch: Math.min(
+              Math.max(1, settings.maxPagesToSearch ?? 20),
+              95,
+            ),
+            maxTotalVideosToFetch: Math.min(
+              Math.max(50, settings.maxTotalVideosToFetch ?? 1000),
+              4750,
+            ),
+            minVideoDurationSeconds: Math.min(
+              Math.max(0, settings.minVideoDurationSeconds ?? 60),
+              600,
+            ),
           };
           setFilterSettings(clampedSettings);
-          sessionStorage.setItem(FILTER_SETTINGS_KEY, JSON.stringify(clampedSettings));
+          sessionStorage.setItem(
+            FILTER_SETTINGS_KEY,
+            JSON.stringify(clampedSettings),
+          );
         } catch (err) {
           log.error("index: failed to parse filter settings", {
             message: err instanceof Error ? err.message : String(err),
@@ -195,7 +218,10 @@ export default function Home() {
   };
 
   // Update filter settings
-  const handleFilterSettingsChange = (key: keyof FilterSettings, value: number) => {
+  const handleFilterSettingsChange = (
+    key: keyof FilterSettings,
+    value: number,
+  ) => {
     const newSettings = { ...filterSettings(), [key]: value };
     setFilterSettings(newSettings);
     try {
@@ -230,10 +256,12 @@ export default function Home() {
         throw new Error(data.message ?? data.error ?? "Failed to train model");
       }
       setModelStatus({
-        available: data.success ? true : modelStatus()?.available ?? false,
+        available: data.success ? true : (modelStatus()?.available ?? false),
         positiveCount: data.positiveCount ?? modelStatus()?.positiveCount ?? 0,
         negativeCount: data.negativeCount ?? modelStatus()?.negativeCount ?? 0,
-        trainedAt: data.success ? new Date().toISOString() : (modelStatus()?.trainedAt ?? null),
+        trainedAt: data.success
+          ? new Date().toISOString()
+          : (modelStatus()?.trainedAt ?? null),
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to train model");
@@ -264,7 +292,10 @@ export default function Home() {
       const res = await fetch("/api/pool");
       if (res.ok) {
         const data = await res.json();
-        setPoolStatus({ count: data.count ?? 0, updatedAt: data.updatedAt ?? null });
+        setPoolStatus({
+          count: data.count ?? 0,
+          updatedAt: data.updatedAt ?? null,
+        });
       }
     } catch {
       // Ignore
@@ -282,7 +313,10 @@ export default function Home() {
       setError("Enter at least one search term (comma-separated)");
       return;
     }
-    const queries = queriesRaw.split(",").map((q) => q.trim()).filter(Boolean);
+    const queries = queriesRaw
+      .split(",")
+      .map((q) => q.trim())
+      .filter(Boolean);
     if (queries.length === 0) {
       setError("Enter at least one search term");
       return;
@@ -344,7 +378,9 @@ export default function Home() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || errorData.message || "Failed to add video");
+        throw new Error(
+          errorData.error || errorData.message || "Failed to add video",
+        );
       }
 
       const data = await response.json();
@@ -352,16 +388,21 @@ export default function Home() {
       setError(null);
       refreshModelStatus();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to add video to favorites");
+      setError(
+        err instanceof Error ? err.message : "Failed to add video to favorites",
+      );
     } finally {
       setAddingFavorite(false);
     }
   };
 
-
   const handleSearch = async () => {
-    const inputElement = document.getElementById("search-query") as HTMLInputElement;
-    const query = inputElement ? inputElement.value.trim() : searchQuery().trim();
+    const inputElement = document.getElementById(
+      "search-query",
+    ) as HTMLInputElement;
+    const query = inputElement
+      ? inputElement.value.trim()
+      : searchQuery().trim();
     const youtubeKey = youtubeApiKey().trim();
 
     if (inputElement && inputElement.value !== searchQuery()) {
@@ -386,8 +427,14 @@ export default function Home() {
       if (youtubeKey) params.set("apiKey", youtubeKey);
       const settings = filterSettings();
       params.set("maxPagesToSearch", settings.maxPagesToSearch.toString());
-      params.set("maxTotalVideosToFetch", settings.maxTotalVideosToFetch.toString());
-      params.set("minVideoDurationSeconds", settings.minVideoDurationSeconds.toString());
+      params.set(
+        "maxTotalVideosToFetch",
+        settings.maxTotalVideosToFetch.toString(),
+      );
+      params.set(
+        "minVideoDurationSeconds",
+        settings.minVideoDurationSeconds.toString(),
+      );
       params.set("usePoolFirst", "true");
 
       const response = await fetch(`/api/youtube?${params.toString()}`);
@@ -413,10 +460,16 @@ export default function Home() {
       setPoolOnly(Boolean(data.poolOnly));
       refreshPoolStatus();
       if (data.videos && data.videos.length === 0) {
-        setError("No videos found. Try a different search term or seed the pool in Settings.");
+        setError(
+          "No videos found. Try a different search term or seed the pool in Settings.",
+        );
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred while searching");
+      setError(
+        err instanceof Error
+          ? err.message
+          : "An error occurred while searching",
+      );
     } finally {
       setLoading(false);
     }
@@ -428,8 +481,10 @@ export default function Home() {
     }
   };
 
-  const displayVideos = () => (viewMode() === "feed" ? feedVideos() : searchVideos());
-  const isLoading = () => (viewMode() === "feed" ? feedLoading() : searchLoading());
+  const displayVideos = () =>
+    viewMode() === "feed" ? feedVideos() : searchVideos();
+  const isLoading = () =>
+    viewMode() === "feed" ? feedLoading() : searchLoading();
 
   return (
     <>
@@ -460,7 +515,11 @@ export default function Home() {
                 disabled={searchLoading()}
                 class="h-10 shrink-0 gap-2 px-4"
               >
-                {searchLoading() ? <Loader class="animate-spin" size={16} /> : <Search size={16} />}
+                {searchLoading() ? (
+                  <Loader class="animate-spin" size={16} />
+                ) : (
+                  <Search size={16} />
+                )}
                 <span class="hidden sm:inline">Search</span>
               </Button>
 
@@ -482,22 +541,22 @@ export default function Home() {
         <div class="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6">
           {poolOnly() && (
             <Alert variant="warning">
-              Showing pooled videos only. Add a YouTube API key in Settings to search YouTube and seed more videos.
+              Showing pooled videos only. Add a YouTube API key in Settings to
+              search YouTube and seed more videos.
             </Alert>
           )}
 
-          {error() && (
-            <Alert variant="destructive">
-              {error()}
-            </Alert>
-          )}
+          {error() && <Alert variant="destructive">{error()}</Alert>}
 
           {viewMode() === "search" && (
             <Button
               type="button"
               variant="ghost"
               size="sm"
-              onClick={() => { setViewMode("feed"); setError(null); }}
+              onClick={() => {
+                setViewMode("feed");
+                setError(null);
+              }}
               class="self-start gap-2"
             >
               <ArrowLeft size={16} />
@@ -512,11 +571,16 @@ export default function Home() {
           ) : displayVideos().length > 0 ? (
             <div class="flex flex-col gap-4">
               <Text variant="headline">
-                {viewMode() === "feed" ? "Recommendations" : `Search: ${searchQuery() || "..."}`}
+                {viewMode() === "feed"
+                  ? "Recommendations"
+                  : `Search: ${searchQuery() || "..."}`}
               </Text>
               <div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
                 {displayVideos().map((video) => (
-                  <VideoCard video={video} onFeedbackChange={refreshModelStatus} />
+                  <VideoCard
+                    video={video}
+                    onFeedbackChange={refreshModelStatus}
+                  />
                 ))}
               </div>
             </div>
@@ -567,7 +631,7 @@ export default function Home() {
             onSeedPool={handleSeedPool}
           />
         </div>
-      </main >
+      </main>
     </>
   );
 }

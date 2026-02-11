@@ -21,7 +21,7 @@ export async function POST(event: APIEvent) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -37,7 +37,7 @@ export async function POST(event: APIEvent) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -74,7 +74,7 @@ export async function POST(event: APIEvent) {
           {
             status: 400,
             headers: { "Content-Type": "application/json" },
-          }
+          },
         );
     }
 
@@ -89,10 +89,11 @@ export async function POST(event: APIEvent) {
       {
         status: 200,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
     log.error("feedback POST: failed", { message: errorMessage });
 
     return new Response(
@@ -103,7 +104,7 @@ export async function POST(event: APIEvent) {
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 }
@@ -116,7 +117,9 @@ export async function GET(event: APIEvent) {
 
     // Support batch requests
     if (videoIdsParam) {
-      const videoIds = videoIdsParam.split(",").filter((id) => id.trim().length > 0);
+      const videoIds = videoIdsParam
+        .split(",")
+        .filter((id) => id.trim().length > 0);
       if (videoIds.length === 0) {
         log.warn("feedback GET: empty videoIds");
         return new Response(
@@ -126,7 +129,7 @@ export async function GET(event: APIEvent) {
           {
             status: 400,
             headers: { "Content-Type": "application/json" },
-          }
+          },
         );
       }
 
@@ -144,7 +147,7 @@ export async function GET(event: APIEvent) {
         {
           status: 200,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -158,7 +161,7 @@ export async function GET(event: APIEvent) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -171,10 +174,11 @@ export async function GET(event: APIEvent) {
       {
         status: 200,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
     log.error("feedback GET: failed", { message: errorMessage });
 
     return new Response(
@@ -185,7 +189,7 @@ export async function GET(event: APIEvent) {
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 }

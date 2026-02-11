@@ -6,7 +6,11 @@ export interface LabelProps extends JSX.LabelHTMLAttributes<HTMLLabelElement> {
 }
 
 const Label: Component<LabelProps> = (props) => {
-  const [local, others] = splitProps(props, ["class", "children", "selectable"]);
+  const [local, others] = splitProps(props, [
+    "class",
+    "children",
+    "selectable",
+  ]);
 
   return (
     <label
@@ -14,7 +18,7 @@ const Label: Component<LabelProps> = (props) => {
         "flex flex-row gap-2 items-center text-base font-medium leading-6 text-foreground",
         "peer-disabled:cursor-not-allowed peer-disabled:opacity-50",
         local.selectable === false && "select-none",
-        local.class
+        local.class,
       )}
       {...others}
     >
