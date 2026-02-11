@@ -1,6 +1,5 @@
 import { Title } from "@solidjs/meta";
 import { HttpStatusCode } from "@solidjs/start";
-import { A } from "@solidjs/router";
 import {
   Button,
   Card,

@@ -8,7 +8,16 @@ import eslintConfigPrettier from "eslint-config-prettier/flat";
 import { defineConfig } from "eslint/config";
 
 export default defineConfig([
-  { ignores: [".output/", ".vinxi/", "node_modules/", "dist/", "build/"] },
+  {
+    ignores: [
+      ".output/",
+      ".vinxi/",
+      "node_modules/",
+      "dist/",
+      "build/",
+      "package-lock.json",
+    ],
+  },
   {
     files: ["**/*.{js,mjs,cjs,ts,mts,cts}"],
     plugins: { js },
@@ -16,6 +25,15 @@ export default defineConfig([
     languageOptions: { globals: { ...globals.browser, ...globals.node } },
   },
   tseslint.configs.recommended,
+  {
+    files: ["**/*.{js,mjs,cjs,ts,mts,cts}"],
+    rules: {
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+      ],
+    },
+  },
   {
     files: ["**/*.json"],
     plugins: { json },
@@ -45,6 +63,14 @@ export default defineConfig([
     plugins: { css },
     language: "css/css",
     extends: ["css/recommended"],
+  },
+  {
+    files: ["src/app.css"],
+    rules: {
+      "css/no-invalid-at-rules": "off",
+      "css/use-baseline": "off",
+      "css/no-important": "off",
+    },
   },
   eslintConfigPrettier,
 ]);

@@ -504,7 +504,7 @@ export async function searchVideosWithFiltering(
 
   const MAX_TOTAL_FETCH = maxTotalVideosToFetch;
   const VIDEOS_PER_PAGE = 50;
-  let allFetchedVideos: Video[] = [];
+  const allFetchedVideos: Video[] = [];
   let nextPageToken: string | undefined = undefined;
   let totalFetched = 0;
   let pageCount = 0;

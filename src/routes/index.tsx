@@ -3,7 +3,6 @@ import { createSignal, onMount } from "solid-js";
 import { Alert, Button, EmptyState, Input, Text } from "~/components/ui";
 import Search from "lucide-solid/icons/search";
 import Settings from "lucide-solid/icons/settings";
-import RefreshCw from "lucide-solid/icons/refresh-cw";
 import ArrowLeft from "lucide-solid/icons/arrow-left";
 import Loader from "lucide-solid/icons/loader";
 import VideoCard, { type Video } from "~/components/video-card";
@@ -186,11 +185,6 @@ export default function Home() {
     } finally {
       setFeedLoading(false);
     }
-  };
-
-  const handleRefreshFeed = () => {
-    setViewMode("feed");
-    loadFeed();
   };
 
   // Update YouTube API key state (without saving)
@@ -383,7 +377,7 @@ export default function Home() {
         );
       }
 
-      const data = await response.json();
+      await response.json();
       setFavoriteVideoUrl("");
       setError(null);
       refreshModelStatus();

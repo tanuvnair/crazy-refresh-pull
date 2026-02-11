@@ -2,10 +2,10 @@ import { Component, JSX, splitProps, Show } from "solid-js";
 import { cn } from "~/lib/utils";
 import Check from "lucide-solid/icons/check";
 
-export interface CheckboxProps extends Omit<
+export type CheckboxProps = Omit<
   JSX.InputHTMLAttributes<HTMLInputElement>,
   "type"
-> {}
+>;
 
 const Checkbox: Component<CheckboxProps> = (props) => {
   const [local, others] = splitProps(props, ["class", "checked", "disabled"]);

@@ -1,7 +1,7 @@
 import { Component, JSX, splitProps } from "solid-js";
 import { cn } from "~/lib/utils";
 
-export interface InputProps extends JSX.InputHTMLAttributes<HTMLInputElement> {}
+export type InputProps = JSX.InputHTMLAttributes<HTMLInputElement>;
 
 const Input: Component<InputProps> = (props) => {
   const [local, others] = splitProps(props, ["class", "type"]);
